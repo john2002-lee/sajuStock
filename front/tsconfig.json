@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    // node --test 로 도는 *.test.ts 는 Node 의 타입 스트리핑을 거친다.
+    // Node ESM 은 확장자를 붙인 완전한 specifier 만 해석하므로 필요하다 (noEmit 이라 허용됨).
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/app/*": ["./src/app/*"],
+      "@/features/*": ["./src/features/*"],
+      "@/shared/*": ["./src/shared/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/store/*": ["./src/store/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  // `_parked` 는 **일부러 얼려 둔 코드**다. 지금 API 에 맞지 않으므로 타입 검사에서
+  // 뺀다 — 되살릴 때를 위해 당시 모습 그대로 두는 것이 목적이고, 지금 컴파일되게
+  // 고치면 그 "당시 모습" 이 사라진다.
+  // 무엇이 왜 얼어 있는지는 `src/features/saju/_parked/README.md` 에 있다.
+  "exclude": ["node_modules", "src/features/**/_parked/**"]
+}

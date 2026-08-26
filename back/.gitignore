@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# 가상환경
+.venv
+
+# 시크릿 — .env에 API 키·DB 자격증명이 들어간다. 템플릿만 커밋한다.
+.env
+.env.*
+!.env.example
+# 사주 경로만 띄울 때 쓰는 최소 템플릿. 값이 전부 불리언·리스트라 비밀이 없고,
+# 루트 README 가 이 파일 이름을 안내하므로 커밋되어야 한다 — `.env.*` 에 걸려
+# 조용히 빠지면 README 가 없는 파일을 가리키게 된다.
+!.env.saju-only.sample
+
+# 로컬 DB (개발용 SQLite — 기동 시 재생성된다)
+*.db
+*.sqlite
+*.sqlite3
+
+# 도구 캐시
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/

@@ -1,0 +1,80 @@
+[project]
+name = "back"
+version = "0.1.0"
+description = "사주 × AI 주식 분석 백엔드 (FastAPI · 비동기 · 사주 엔진 + 멀티 에이전트)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.118",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.11",
+    "pydantic-settings>=2.8",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "httpx>=0.28",
+    # 1.5 에서 추가된 get_valuation_measures() 가 필요하다. 국내 종목(.KS/.KQ)은
+    # info["trailingPE"]/["priceToBook"] 가 항상 None 이라 PER/PBR 의 유일한 소스다.
+    "yfinance>=1.5",
+    "alembic>=1.18.5",
+    # **유일한 DB 드라이버다.** alembic 도 async 엔진(asyncpg)으로 돈다.
+    "asyncpg>=0.31.0",
+    "python-dotenv>=1.2.2",
+    "pykrx>=1.2.8",
+    "google-genai>=1.0",
+    "langgraph>=0.6",
+    "pgvector>=0.3",
+    # 사주 엔진의 유일한 외부 의존이다. 원본 프로젝트가 쓰던 `lunar-javascript` 와
+    # **같은 저자(6tail)의 파이썬 포팅본**이라 API 가 1:1 로 대응한다 —
+    # `Lunar`/`Solar`/`EightChar.setSect`/`getYun` 이 그대로 있다.
+    #
+    # 핀을 낮추면 안 된다. 자시 관례를 명시하는 `setSect` 와 십이운성 표
+    # (`EightChar.CHANG_SHENG`)가 이 계열에 있고, 둘 다 `domain/saju` 가
+    # 직접 의존한다 (`day_master_attrs._resolve_chang_sheng_offset` 주석).
+    "lunar-python>=1.4.8",
+]
+
+# `fastapi dev` / `fastapi run` 이 파일명 탐색 순서에 의존하지 않도록 진입점을 명시한다.
+[tool.fastapi]
+entrypoint = "main:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "ruff>=0.9",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.ruff.lint.per-file-ignores]
+# **alembic 이 생성하는 파일이다.** `alembic revision --autogenerate` 가 자기 템플릿으로
+# 다시 쓰므로, 손으로 import 를 정렬하거나 줄을 접어도 다음 리비전에서 되돌아온다 —
+# 규칙을 지킬 수 없는 파일에 규칙을 거는 셈이라 린트가 매번 45건씩 울리고,
+# 그 소음이 진짜 경고를 묻는다.
+#
+# 원본 StockProject 에서 그대로 넘어온 상태다(그쪽도 `ruff check .` 이 같은 45건으로
+# 실패한다). 여기서 끄는 이유는 README 가 `ruff check .` 을 검증 명령으로 안내하기
+# 때문이다 — 첫날부터 실패하는 명령은 사람들에게 린트를 무시하도록 가르친다.
+#
+# UP007/UP035 는 alembic 템플릿이 찍는 `from typing import Union` 과
+# `Union[str, None]` 이다 — 파일 머리말이 그 모양으로 고정돼 있다.
+"alembic/versions/*.py" = ["I001", "E501", "UP007", "UP035"]
+
+# 프롬프트 원문은 문장 중간에서 줄바꿈하면 오히려 읽기 어렵다.
+"app/agents/prompts.py" = ["E501"]
+"app/domain/saju/report_prompt.py" = ["E501"]
+# 금지 표현 정규식은 한 줄로 붙어 있어야 패턴이 읽힌다.
+"app/domain/saju/report_policy.py" = ["E501"]
+# 대조 검증 스크립트는 `sys.path` 를 손본 뒤 import 해야 해서 E402 가 불가피하다.
+"tests/dump_python_charts.py" = ["E402"]
+"tests/gen_random_cases.py" = ["E402"]

@@ -1,0 +1,22 @@
+# 빌드 컨텍스트에서 뺄 것.
+#
+# `.venv` 가 가장 크다 — 없어도 빌더가 `uv sync` 로 다시 만들고, 로컬 가상환경을
+# 올려 보내면 컨텍스트 전송만 수백 MB 다. 게다가 그것은 **호스트 플랫폼용** 이라
+# 이미지 안에서 쓸 수도 없다.
+#
+# `.env` 는 크기가 아니라 **비밀** 때문이다. 지금 Dockerfile 은 `app/`·`alembic/`·
+# `scripts/` 만 COPY 하므로 들어갈 일이 없지만, `COPY . .` 한 줄이 추가되는 순간
+# API 키가 이미지 레이어에 굽힌다. 그때 알아채기는 어렵고 되돌릴 수는 없다.
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+.env
+.env.*
+!.env.example
+
+tests/
+docs/
+*.md

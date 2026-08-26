@@ -1,0 +1,37 @@
+# DB 컨테이너는 없다.
+#
+# 예전에는 여기서 `postgres:17-alpine` 을 띄우고 DATABASE_URL 을 `db:5432` 로 덮어썼다.
+# 그러면 컨테이너로 띄운 앱과 로컬에서 띄운 앱이 **다른 DB** 를 보게 된다 — 마이그레이션을
+# 한쪽에만 적용하거나, 프런트의 NextAuth(users)가 Supabase 에 쓰는 동안 백엔드는 컨테이너
+# DB 에서 그 사용자를 못 찾는 상태가 된다(`services/orphan_service` 는 그걸 "고아"로 읽는다).
+#
+# 게다가 그 이미지에는 pgvector 가 없어 RAG 경로가 컨테이너에서만 조용히 죽는다.
+#
+# 이제 주소는 `.env` 하나가 정한다. 로컬·컨테이너·배포가 모두 같은 Supabase 를 본다.
+services:
+  # 스키마를 적용하고 **끝나는** 서비스. api 는 이것이 성공한 뒤에 뜬다.
+  #
+  # 앱이 기동 때 스키마를 만들지 않기 때문에(`DB_CREATE_ALL_ON_STARTUP=false`)
+  # 적용할 주체가 따로 있어야 한다. 앱 안에서 `upgrade head` 를 부르는 방법도 있지만
+  # 그러면 워커 수만큼 동시에 마이그레이션이 돌고, 실패해도 앱은 뜬 상태로 남는다.
+  # 별도 서비스로 두면 **실패가 기동을 막는다** — 스키마가 어긋난 채 뜨는 것보다 낫다.
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    env_file:
+      - .env
+    restart: "no"
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    # `.env` 를 그대로 읽는다. 여기에 값을 다시 적으면 두 곳이 어긋난다.
+    env_file:
+      - .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # 크래시·호스트 재부팅 뒤에도 스스로 돌아온다. `migrate` 는 "끝나는" 서비스라
+    # 재시작하면 안 되므로(`restart: "no"`) 여기만 켠다.
+    restart: unless-stopped

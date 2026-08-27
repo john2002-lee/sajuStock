@@ -114,9 +114,10 @@ export default function ServicePickerPage() {
           <h1 className="font-display text-[28px] leading-[1.25] text-ink md:text-[36px]">
             두 개의 축으로 봅니다
             {/* 제품 단계 표기 — **제호가 없는 화면이라 여기가 유일한 자리다.**
-                두 서비스를 잇는 계산은 아직 화면에 붙지 않았고(`features/saju/_parked/`),
-                주식 판단도 판정 이력이 쌓이는 중이다. 그 상태를 첫 문장 옆에서
-                밝히지 않으면 사용자가 완성된 제품으로 읽는다.
+                두 서비스 **각자가** 아직 베타다: 사주는 강약 판정에 견줄 외부 기준이
+                없고(`features/saju/components/ConventionNotice.tsx`), 주식 판단은
+                판정 이력이 쌓이는 중이다. 그 상태를 첫 문장 옆에서 밝히지 않으면
+                사용자가 완성된 제품으로 읽는다.
 
                 `font-sans-kr` 로 표제 서체를 빠져나온다 — `font-display`(Gothic A1)는
                 700 이상만 불러오므로 이 크기에서 얇은 자를 쓰면 합성 굵기가 된다.

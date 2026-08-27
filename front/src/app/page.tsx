@@ -114,7 +114,7 @@ export default function ServicePickerPage() {
           <h1 className="font-display text-[28px] leading-[1.25] text-ink md:text-[36px]">
             두 개의 축으로 봅니다
             {/* 제품 단계 표기 — **제호가 없는 화면이라 여기가 유일한 자리다.**
-                두 서비스를 잇는 계산은 아직 화면에 붙지 않았고(아래 각주),
+                두 서비스를 잇는 계산은 아직 화면에 붙지 않았고(`features/saju/_parked/`),
                 주식 판단도 판정 이력이 쌓이는 중이다. 그 상태를 첫 문장 옆에서
                 밝히지 않으면 사용자가 완성된 제품으로 읽는다.
 
@@ -140,21 +140,6 @@ export default function ServicePickerPage() {
             <ServicePanel key={service.href} service={service} />
           ))}
         </div>
-
-        {/* 두 서비스가 어떤 사이인지 한 줄. 이 문장이 없으면 사주 카드가 "재미로
-            보는 부록" 으로 읽히고, 그 순간 사람들은 누르지 않는다.
-
-            **다만 아직 일어나지 않은 일을 일어난다고 적지 않는다.** 성향을 종목
-            판단에 결합하는 계산은 백엔드에 있지만(`domain/fit.py`·`verdict.py`),
-            사용자가 자기 성향을 만들고 확인하는 화면은 지금 빠져 있다
-            (`features/saju/_parked/`). 그 상태에서 "나란히 보여 줍니다" 라고 쓰면
-            눌러 본 사람이 없는 기능을 찾게 된다. */}
-        <p className="border-t border-line-20 pt-4 text-[12.5px] leading-relaxed text-muted-55">
-          두 서비스는 <span className="text-ink">같은 전제</span> 위에 있습니다 — 같은
-          종목이라도 누가 보느냐에 따라 맞는 판단이 다르다는 것. 지금은 각자 답하고,
-          사주로 읽은 성향을 종목 판단에 결합하는 것은 준비 중입니다. 그때에도 성향은
-          판단을 보수적인 쪽으로만 움직이며, 없던 매수 판단을 만들어내지 않습니다.
-        </p>
       </main>
 
       <Footer service="both" />

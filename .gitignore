@@ -34,6 +34,17 @@
 !.env*.example
 !.env*.sample
 
+# **선행 점이 없는 이름도 잡는다.** 위 두 줄은 `.env` 로 시작하는 것만 걸어서,
+# `.env.deploy` 를 내려받아 `env.download` 로 저장한 파일이 그대로 새어 나갔다 —
+# 그 안에 ADMIN_API_KEY·ADVICE_API_KEY·AUTH_SECRET·구글 OAuth 시크릿과 Supabase
+# 비밀번호가 **실제 값으로** 들어 있다. 이름을 하나 지정해 막는 것은 그물이 아니라
+# 구멍 하나를 메우는 것이라, 이 형태 전체를 건다.
+env.*
+# 되살리는 것들 — 배포 설정과 템플릿에는 비밀이 없다.
+!env.yaml
+!env*.example
+!env*.sample
+
 # 자격증명 파일 — 이 저장소에는 아직 없지만, 생기는 순간 걸려야 한다.
 *.pem
 *.key

@@ -113,6 +113,19 @@ export default function ServicePickerPage() {
         <header className="max-w-3xl space-y-3.5">
           <h1 className="font-display text-[28px] leading-[1.25] text-ink md:text-[36px]">
             두 개의 축으로 봅니다
+            {/* 제품 단계 표기 — **제호가 없는 화면이라 여기가 유일한 자리다.**
+                두 서비스를 잇는 계산은 아직 화면에 붙지 않았고(아래 각주),
+                주식 판단도 판정 이력이 쌓이는 중이다. 그 상태를 첫 문장 옆에서
+                밝히지 않으면 사용자가 완성된 제품으로 읽는다.
+
+                `font-sans-kr` 로 표제 서체를 빠져나온다 — `font-display`(Gothic A1)는
+                700 이상만 불러오므로 이 크기에서 얇은 자를 쓰면 합성 굵기가 된다.
+                금빛 pill(사주 `ConventionNotice`)이 아니라 중립 테두리를 쓰는 것은
+                이 화면이 어느 서비스의 팔레트도 들이지 않기 때문이다 (위 주석). */}
+            {" "}
+            <span className="ml-2 inline-block whitespace-nowrap rounded-pill border border-line-25 px-2.5 py-1 align-middle font-sans-kr text-[11px] font-medium leading-none tracking-normal text-muted-65 md:ml-2.5 md:text-[12px]">
+              베타 테스트 중
+            </span>
           </h1>
           <p className="text-[14px] leading-relaxed text-muted-65 md:text-[15px]">
             하나는 시장이고, 하나는 당신입니다. 같은 종목이라도 누가 보느냐에 따라

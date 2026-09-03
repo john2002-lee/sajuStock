@@ -5,7 +5,7 @@
 1. **pykrx** — `get_market_cap_by_ticker(date)` 한 번으로 전 종목을 받는다. 가장 싸다.
    단, KRX 데이터포털이 로그인을 요구하도록 바뀌어 `KRX_ID` / `KRX_PW` 가 없으면
    실패한다. pykrx 는 그것을 **`os.environ` 에서** 읽으므로 `.env` 에 적어 두는 것만
-   으로는 닿지 않는다 — 그 간극을 `_prepare_pykrx()` 가 메운다.
+   으로는 닿지 않는다 — 그 간극을 `krx/session.prepare_pykrx()` 가 메운다.
 2. **yfinance** — 종목당 1회 호출이라 비싸다(~1초). 그래서 폴백이고, 아직 시총이 없는
    종목만, 한 번에 `limit` 개까지만 채운다. 며칠에 걸쳐 채워지는 것을 전제로 한다.
 
@@ -13,15 +13,12 @@
 며칠 스테일해도 순서가 바뀌지 않는다.
 """
 
-import contextlib
-import io
 import logging
-import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
-from types import ModuleType
 
 from app.core.config import settings
+from app.integrations.krx.session import prepare_pykrx
 from app.schemas.stock import MarketCapRecord
 
 logger = logging.getLogger(__name__)
@@ -37,57 +34,9 @@ def _to_yyyymmdd(value: date) -> str:
     return value.strftime("%Y%m%d")
 
 
-_pykrx_stock: ModuleType | None = None
-
-
-def _prepare_pykrx() -> ModuleType:
-    """pykrx 를 쓸 수 있는 상태로 만들고 `stock` 모듈을 돌려준다.
-
-    ## 자격증명을 `os.environ` 으로 옮기는 것이 이 함수의 핵심이다
-
-    pykrx 는 `os.getenv("KRX_ID")` 를 직접 읽는다. 반면 pydantic-settings 는 `.env`
-    를 `Settings` 객체로만 옮기고 `os.environ` 은 건드리지 않는다(`dotenv_values`).
-    그래서 `.env` 를 정확히 채워도 pykrx 에는 닿지 않았고, 배치는 자격증명이 있는데도
-    매번 yfinance 폴백으로 내려갔다. 경계 밖 라이브러리의 규약이므로 경계에서 흡수한다.
-
-    ## import 보다 **먼저** 넣어야 한다
-
-    pykrx 는 import 시점에 로그인한다 — `website/comm/webio.py` 가 모듈 최상단에서
-    `build_krx_session()` 을 부르고, 그 기본 인자가 `os.getenv("KRX_ID")` 다. 둘 다
-    import 때 확정되므로 순서가 뒤집히면 첫 로그인이 빈손으로 나간다. 그래서 import
-    를 이 함수가 소유한다 — 호출부가 순서를 지켜야 할 필요를 없앤다.
-
-    ## 그 로그인이 **로그인 ID 를 stdout 에 찍는다**
-
-    서버 로그에 계정을 남길 이유가 없어 삼켜서 DEBUG 로만 흘린다. 세션 만료 뒤의
-    재로그인은 ID 를 찍지 않으므로(`comm/auth.get_auth_session`) 이 한 번으로 족하다.
-    """
-    global _pykrx_stock
-    if _pykrx_stock is not None:
-        return _pykrx_stock
-
-    # 빈 문자열은 넣지 않는다 — pykrx 는 truthy 검사를 하므로 결과는 같지만,
-    # 실제 OS 환경변수로 자격증명을 준 경우를 빈 `.env` 값이 덮어써서는 안 된다.
-    if settings.krx_id:
-        os.environ["KRX_ID"] = settings.krx_id
-    if settings.krx_pw:
-        os.environ["KRX_PW"] = settings.krx_pw
-
-    chatter = io.StringIO()
-    with contextlib.redirect_stdout(chatter):
-        from pykrx import stock
-
-    for line in chatter.getvalue().splitlines():
-        if line.strip():
-            logger.debug("pykrx: %s", line.strip())
-
-    _pykrx_stock = stock
-    return stock
-
-
 def _fetch_one_day(day: date) -> dict[str, int]:
     """해당 일자의 전 종목 시총. 휴장일이면 빈 dict."""
-    stock = _prepare_pykrx()
+    stock = prepare_pykrx()
 
     caps: dict[str, int] = {}
     for market in _KRX_MARKETS:

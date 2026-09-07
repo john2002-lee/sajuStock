@@ -1,6 +1,6 @@
 # back CI/CD — 컨텍스트
 
-Last Updated: 2026-09-07
+Last Updated: 2026-09-07 (첫 실행 실패 분석 반영)
 
 ## GCP 현재 상태 (실측)
 
@@ -53,3 +53,39 @@ Last Updated: 2026-09-07
 - `AMPLITUDE_AI_API_KEY` 가 `.env`·`.env.example` 에는 있으나 Secret Manager 에 없다.
   → **지금 운영 백엔드는 Amplitude 키 없이 돈다.** 올리려면 `secret-keys.txt` 에 한 줄
   추가하고 `deploy.ps1` 을 로컬에서 한 번 돌려야 한다 (값 업로드는 CI 가 못 한다).
+
+## 첫 실행 실패 분석 (run 34092974343)
+
+게이트·WIF 인증·setup-gcloud 는 전부 성공. `비밀 바인딩 결정` 에서 죽었고 이후
+스텝은 skip 됐다 — **배포는 일어나지 않았다.**
+
+증상: 선언된 8개가 전부 "Secret Manager 에 없음" 으로 분류되고
+`DATABASE_URL 없음` 으로 exit 1. annotation 10건이 그것을 말해 줬다
+(로그 API 는 미인증으로 403, `check-runs/<id>/annotations` 는 공개로 읽힌다).
+
+### 근본 원인 두 개
+
+1. **정규화가 양쪽에서 달랐다.** 선언 목록만 `tr -d ' \t\r'` 를 지나고 gcloud
+   출력은 그대로 읽었다. 키가 `DATABASE_URL<CR>` 로 들어가 8개를 받아 놓고도
+   조회가 전부 빗나갔다. → `normalize()` 하나로 양쪽을 같은 방식으로 다듬는다.
+   (CI 와 같은 셸 플래그로 로컬 재현됨: "Secret Manager: 8개 / 바인딩 0 / 누락 8")
+
+2. **실패를 데이터로 오인했다.** `mapfile -t present < <(gcloud ...)` 는 프로세스
+   치환의 종료 코드를 보지 않는다. 호출이 실패해 stdout 이 비면 "시크릿이 0개" 로
+   읽히고, 원인인 stderr 는 어디에도 남지 않는다. → exit 코드와 stderr 를 붙잡고,
+   실패했거나 0건이면 `gcloud auth list`·`config list` 까지 찍고 멈춘다.
+
+### 왜 로컬 검증을 통과했는가 (이게 진짜 교훈이다)
+
+처음 로컬 하네스가 `bash -e` 였다. Actions 의 리눅스 기본 셸은
+`bash --noprofile --norc -e -o pipefail` 이다. 플래그가 다른 셸에서 검증하면
+검증한 것이 아니다. 이후 하네스를 그 플래그로 맞췄고, 그러자 원인 1이 즉시 재현됐다.
+
+부수적으로 `pipefail` 아래에서는 `grep -v '^$'` 가 전부 걸러졌을 때 exit 1 로
+스텝을 죽인다 — 그래서 필터를 sed 한 개로 합쳤다.
+
+### 함께 반영한 것
+
+`auth`/`setup-gcloud` 에 `project_id` 를 넘긴다. 없으면 액션이
+`CLOUDSDK_CORE_PROJECT` 를 export 하지 않고, WIF 외부 계정 자격증명은 일부 API
+호출에서 그 값을 쿼터 프로젝트로 쓴다.

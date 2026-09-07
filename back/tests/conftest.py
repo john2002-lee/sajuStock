@@ -51,6 +51,9 @@ TEST_DATABASE_URL = (os.environ.get("TEST_DATABASE_URL") or "").strip()
 #: 이 None 을 낸다 (`rag_off_by_default`).
 _NO_VECTOR_STORE = ""
 
+#: `SKIP_DB_TESTS` 에서 참으로 볼 값 (`pytest_collection_modifyitems`).
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
 
 def _target(url: str) -> tuple[str | None, int | None, str]:
     """같은 DB 를 가리키는지 비교할 키. 자격증명·쿼리스트링은 무시한다."""
@@ -87,6 +90,34 @@ def require_test_database_url() -> str:
             "테스트는 스키마를 지우고 다시 만들므로 별도 프로젝트여야 합니다."
         )
     return TEST_DATABASE_URL
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """CI 에서 **DB 없이 도는 테스트만** 고른다. 로컬 동작은 건드리지 않는다.
+
+    `SKIP_DB_TESTS` 가 켜져 있고 `TEST_DATABASE_URL` 이 없을 때에만 Postgres 를
+    요구하는 항목에 skip 을 건다. 플래그가 없으면 이 훅은 아무 일도 하지 않으므로
+    `require_test_database_url` 의 RuntimeError 가 예전과 **똑같이** 난다.
+
+    그 조건이 두 개인 것이 핵심이다. "주소가 없으면 알아서 건너뛴다" 로 만들면,
+    개발자가 `TEST_DATABASE_URL` 을 빠뜨린 채 초록을 보고 넘어가게 된다 — DB 테스트
+    183개가 조용히 안 돈 상태로. 그것은 이 파일 머리말이 SQLite 폴백을 없애면서
+    막으려던 것과 같은 종류의 사고다. 플래그를 켜는 곳은 배포 워크플로 하나뿐이고,
+    거기서는 "DB 를 안 쓴다" 가 의도다.
+
+    판정 기준은 **`pg_engine` 픽스처 하나** 다. DB 를 쓰는 경로는 전부 이것을 거친다
+    (`db_session`→`pg_engine`, `repo`·`client`→`db_session`). 파일명 목록이나 마커로
+    고르면 테스트가 추가될 때마다 목록이 어긋나고, 어긋난 쪽은 **조용히 안 도는 쪽**이다.
+    """
+    if TEST_DATABASE_URL:
+        return
+    if os.environ.get("SKIP_DB_TESTS", "").strip().lower() not in _TRUTHY:
+        return
+
+    skip_db = pytest.mark.skip(reason="TEST_DATABASE_URL 없음 (SKIP_DB_TESTS)")
+    for item in items:
+        if "pg_engine" in getattr(item, "fixturenames", ()):
+            item.add_marker(skip_db)
 
 
 @pytest.fixture(autouse=True)

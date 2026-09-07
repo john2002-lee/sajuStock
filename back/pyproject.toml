@@ -30,6 +30,7 @@ dependencies = [
     # (`EightChar.CHANG_SHENG`)가 이 계열에 있고, 둘 다 `domain/saju` 가
     # 직접 의존한다 (`day_master_attrs._resolve_chang_sheng_offset` 주석).
     "lunar-python>=1.4.8",
+    "amplitude-ai>=1.13.0",
 ]
 
 # `fastapi dev` / `fastapi run` 이 파일명 탐색 순서에 의존하지 않도록 진입점을 명시한다.

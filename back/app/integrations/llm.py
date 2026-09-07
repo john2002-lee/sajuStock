@@ -25,6 +25,7 @@
 """
 
 import logging
+import time
 
 from google import genai
 from google.genai import types
@@ -33,6 +34,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exceptions import LLMRefusedError
+from app.integrations import amplitude
 
 logger = logging.getLogger(__name__)
 
@@ -147,17 +149,149 @@ def _guard(response: types.GenerateContentResponse) -> None:
         )
 
 
+def _usage(response: types.GenerateContentResponse | None) -> dict:
+    """Gemini 의 사용량을 `track_ai_message` 의 인자 이름으로 옮긴다.
+
+    이름이 다 다르다 (`prompt_token_count` ↔ `input_tokens`). 그 변환을 여기 한 번만
+    두는 것이 이 파일의 원칙과 같다 — 프로바이더 어휘가 밖으로 새지 않는다.
+
+    사용량이 없으면 빈 dict 다. 그러면 SDK 가 비용을 계산하지 않을 뿐, 이벤트 자체는
+    나간다 — 지연과 모델만 있어도 없는 것보다 낫다.
+    """
+    meta = getattr(response, "usage_metadata", None)
+    if meta is None:
+        return {}
+    fields = {
+        "input_tokens": "prompt_token_count",
+        "output_tokens": "candidates_token_count",
+        "total_tokens": "total_token_count",
+        "reasoning_tokens": "thoughts_token_count",
+        "cache_read_tokens": "cached_content_token_count",
+    }
+    return {
+        key: value
+        for key, attr in fields.items()
+        if (value := getattr(meta, attr, None)) is not None
+    }
+
+
+def _record(
+    *,
+    content: str,
+    latency_ms: float,
+    system_prompt: str | None = None,
+    response: types.GenerateContentResponse | None = None,
+    error: BaseException | None = None,
+) -> None:
+    """LLM 호출 한 건을 Agent Analytics 에 남긴다.
+
+    **세션이 없으면 아무것도 하지 않는다.** 워밍업·배치·테스트가 이 파일을 부르는
+    경로가 있고, 그때 계측을 강요할 이유가 없다 (`integrations/amplitude` 주석).
+
+    실패 경로에서도 부른다. 성공만 기록하면 지연·오류율 차트가 **실패를 통째로
+    못 보고**, 타임아웃난 호출은 대시보드에서 존재하지 않은 일이 된다.
+
+    이 함수는 절대 던지지 않는다 — 계측 때문에 판단이 죽으면 안 된다.
+    """
+    session = amplitude.active_session()
+    if session is None:
+        return
+
+    try:
+        finish = None
+        if response is not None and (candidates := response.candidates or []):
+            raw = getattr(candidates[0], "finish_reason", None)
+            finish = getattr(raw, "name", None) or (str(raw) if raw else None)
+
+        session.track_ai_message(
+            content,
+            settings.gemini_model,
+            "gemini",
+            latency_ms,
+            system_prompt=system_prompt,
+            max_output_tokens=settings.llm_max_tokens,
+            finish_reason=finish,
+            is_error=error is not None,
+            error_message=str(error) if error is not None else None,
+            error_type=type(error).__name__ if error is not None else None,
+            **_usage(response),
+        )
+    except Exception:
+        logger.warning("Amplitude 기록에 실패했습니다", exc_info=True)
+
+
+def _record_embedding(
+    *, latency_ms: float, count: int, error: BaseException | None = None
+) -> None:
+    """임베딩 호출 한 건. 본문(색인 대상 텍스트)은 남기지 않는다.
+
+    RAG 색인은 한 번에 수십 개 청크를 보낸다 — 그 원문을 전부 실어 보내면 이벤트가
+    본문으로 뒤덮이고, 얻는 것은 이미 우리 DB 에 있는 텍스트의 사본뿐이다.
+    비용·지연을 보는 것이 목적이므로 개수만 남긴다.
+    """
+    session = amplitude.active_session()
+    if session is None:
+        return
+
+    try:
+        # `track_embedding` 은 `is_error` 를 받지 않는다 (`track_ai_message` 와
+        # 다르다) — 실패 사실은 `context` 로 남긴다.
+        session.track_embedding(
+            settings.embedding_model,
+            "gemini",
+            latency_ms,
+            dimensions=settings.embedding_dimensions,
+            context={
+                "input_count": count,
+                **({"error": str(error)} if error is not None else {}),
+            },
+        )
+    except Exception:
+        logger.warning("Amplitude 임베딩 기록에 실패했습니다", exc_info=True)
+
+
 async def ask_text(system_prompt: str, user_content: str) -> str:
     """자유 서술 응답 한 건. 거절되면 `LLMRefusedError`."""
     client = get_client()
-    response = await client.aio.models.generate_content(
-        model=settings.gemini_model,
-        contents=user_content,
-        config=types.GenerateContentConfig(**_base_config(system_prompt)),
-    )
+    started = time.monotonic()
+    try:
+        response = await client.aio.models.generate_content(
+            model=settings.gemini_model,
+            contents=user_content,
+            config=types.GenerateContentConfig(**_base_config(system_prompt)),
+        )
+    except BaseException as exc:
+        _record(
+            content="",
+            latency_ms=(time.monotonic() - started) * 1000,
+            system_prompt=system_prompt,
+            error=exc,
+        )
+        raise
 
-    _guard(response)
-    return (response.text or "").strip()
+    latency_ms = (time.monotonic() - started) * 1000
+    try:
+        _guard(response)
+    except BaseException as exc:
+        # 거절도 호출이다. 여기서 기록하지 않으면 SAFETY 로 막힌 호출이 차트에서
+        # 사라져, 토큰만 태우고 결과가 없는 구간이 보이지 않게 된다.
+        _record(
+            content="",
+            latency_ms=latency_ms,
+            system_prompt=system_prompt,
+            response=response,
+            error=exc,
+        )
+        raise
+
+    text = (response.text or "").strip()
+    _record(
+        content=text,
+        latency_ms=latency_ms,
+        system_prompt=system_prompt,
+        response=response,
+    )
+    return text
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
@@ -175,12 +309,26 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
         return []
 
     client = get_client()
-    response = await client.aio.models.embed_content(
-        model=settings.embedding_model,
-        contents=texts,  # type: ignore[arg-type]
-        config=types.EmbedContentConfig(
-            output_dimensionality=settings.embedding_dimensions
-        ),
+    started = time.monotonic()
+    try:
+        response = await client.aio.models.embed_content(
+            model=settings.embedding_model,
+            contents=texts,  # type: ignore[arg-type]
+            config=types.EmbedContentConfig(
+                output_dimensionality=settings.embedding_dimensions
+            ),
+        )
+    except BaseException as exc:
+        _record_embedding(
+            latency_ms=(time.monotonic() - started) * 1000,
+            count=len(texts),
+            error=exc,
+        )
+        raise
+
+    _record_embedding(
+        latency_ms=(time.monotonic() - started) * 1000,
+        count=len(texts),
     )
 
     embeddings = response.embeddings or []
@@ -204,22 +352,51 @@ async def ask_structured[ModelT: BaseModel](
     요구가 프로바이더를 바꿔도 같은 방식으로 지켜진다.
     """
     client = get_client()
-    response = await client.aio.models.generate_content(
-        model=settings.gemini_model,
-        contents=user_content,
-        config=types.GenerateContentConfig(
-            **_base_config(system_prompt),
-            response_mime_type="application/json",
-            response_schema=output_model,
-        ),
+    started = time.monotonic()
+    try:
+        response = await client.aio.models.generate_content(
+            model=settings.gemini_model,
+            contents=user_content,
+            config=types.GenerateContentConfig(
+                **_base_config(system_prompt),
+                response_mime_type="application/json",
+                response_schema=output_model,
+            ),
+        )
+    except BaseException as exc:
+        _record(
+            content="",
+            latency_ms=(time.monotonic() - started) * 1000,
+            system_prompt=system_prompt,
+            error=exc,
+        )
+        raise
+
+    latency_ms = (time.monotonic() - started) * 1000
+    try:
+        _guard(response)
+
+        parsed = response.parsed
+        if not isinstance(parsed, output_model):
+            raise LLMRefusedError("구조화 응답을 파싱하지 못했습니다.")
+    except BaseException as exc:
+        _record(
+            content="",
+            latency_ms=latency_ms,
+            system_prompt=system_prompt,
+            response=response,
+            error=exc,
+        )
+        raise
+
+    # 본문은 모델이 실제로 낸 JSON 문자열이다. `parsed` 를 다시 직렬화하면 스키마
+    # 기본값이 섞여 모델이 말하지 않은 필드가 들어간다.
+    _record(
+        content=(response.text or "").strip(),
+        latency_ms=latency_ms,
+        system_prompt=system_prompt,
+        response=response,
     )
-
-    _guard(response)
-
-    parsed = response.parsed
-    if not isinstance(parsed, output_model):
-        raise LLMRefusedError("구조화 응답을 파싱하지 못했습니다.")
-
     return parsed
 
 

@@ -9,6 +9,7 @@ import json
 import logging
 
 from app.agents.prompts import ANALYST_PROFILES, AgentProfile
+from app.integrations import amplitude
 from app.integrations.llm import ask_structured
 from app.schemas.advice import AgentOpinion, AnalystOutput
 from app.schemas.rag import DocRef, RetrievedDoc
@@ -137,8 +138,13 @@ async def _invoke(
     metrics: StockMetrics,
     documents: list[RetrievedDoc] | None = None,
 ) -> AgentOpinion:
+    # 계측이 **여기** 있는 이유: 이 함수가 세 에이전트의 유일한 호출 지점이고,
+    # 그래프 경로(`graph/nodes.py`)와 비그래프 경로(`services/advice_service`)가
+    # 둘 다 지난다. `nodes.py` 에만 두었더니 `POST /stocks/advice` 에서는 네 번의
+    # LLM 호출이 전부 부모 에이전트에 붙어, 멀티 에이전트 화면이 비어 있었다.
     try:
-        output = await ask_structured(profile.full_prompt(), context, AnalystOutput)
+        async with amplitude.child(profile.key):
+            output = await ask_structured(profile.full_prompt(), context, AnalystOutput)
         summary = clean_text(output.summary)
     except Exception as exc:
         logger.warning("%s 호출 실패 (%s) → 규칙 기반 의견으로 대체", profile.name, exc)

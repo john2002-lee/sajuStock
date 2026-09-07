@@ -243,6 +243,16 @@ class Settings(BaseSettings):
     # "의견 3건 + LLM 판단" 을 "의견 0건 + 규칙 판단" 으로 바꾼다.
     llm_max_retries: int = Field(default=0, ge=0)
 
+    # --- 분석 (Amplitude Agent Analytics) ---
+    #
+    # 비워 두면 계측이 통째로 꺼진다. 실패가 아니라 설계다 — 로컬 개발과 테스트가
+    # 네트워크 없이 돌아야 하고, 분석이 안 붙었다고 AI 판단이 멈추면 안 된다.
+    # 켜졌는지 여부는 기동 로그가 말한다 (`app/main.py` lifespan).
+    #
+    # **`gemini_api_key` 와 달리 SDK 가 환경 변수를 스스로 읽지 않는다.** 여기로
+    # 들어와야 `integrations/amplitude` 가 클라이언트를 만든다.
+    amplitude_ai_api_key: str | None = None
+
     # --- RAG (벡터 검색) ---
     # **대개 비워 둔다.** 주 DB 가 Postgres 라 그것을 그대로 벡터 저장소로 쓴다 —
     # 같은 Supabase 인스턴스가 앱 테이블과 pgvector 테이블을 함께 담는다.

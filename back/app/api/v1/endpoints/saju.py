@@ -21,6 +21,7 @@
 """
 
 import logging
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -36,6 +37,7 @@ from app.domain.saju.followup import (
     normalize_free_text,
 )
 from app.domain.saju.report_policy import ContentRefusalError
+from app.integrations import amplitude
 from app.integrations.llm import ask_text
 from app.integrations.saju.mapper import to_reading_response
 from app.schemas.saju import (
@@ -325,6 +327,31 @@ async def _ask_report_llm(system: str, user: str) -> str:
     결과라 곧바로 폴백한다), 그 구분은 프로바이더의 어휘가 아니라 **도메인의**
     어휘여야 한다 — 서비스가 `LLMRefusedError` 를 알면 Gemini 를 아는 것이 된다.
     """
+    # 계측 세션을 **여기서** 연다. 위 호출부 대부분은 `saju_job_store.start` 로
+    # 나중에 실행되는 작업이라, 엔드포인트 함수에서 열면 작업이 도는 시점에는 이미
+    # 닫혀 있다. 이 함수가 사주의 유일한 LLM 깔때기이므로 여기 두면 한 건도 새지
+    # 않는다.
+    #
+    # **본문은 나가지 않는다.** `SAJU_REPORT` 는 metadata_only 인스턴스에서 났다
+    # (`integrations/amplitude` 의 "두 도메인" 절) — 생년월일시가 프롬프트에 실려
+    # 있고 그것은 민감정보다.
+    #
+    # 열려 있는 세션을 재사용하지 **않는다.** 한때 그렇게 두었는데, 이 앱에서
+    # 사주 세션을 바깥에서 여는 경로가 없어 죽은 분기였고, 더 나쁘게는 언젠가
+    # 주식 세션(content_mode="full") 안에서 이 함수가 불리면 생년월일시가 본문째
+    # 나가는 구멍이었다. 호출 하나에 세션 하나가 안전하다 — 대신 리포트가 정책
+    # 위반으로 재생성되면 두 개의 대화로 보인다.
+    async with amplitude.session(
+        amplitude.SAJU_REPORT,
+        # 무료 경로는 신원을 만들지 않는다 — 이 서비스가 아무것도 저장하지 않는
+        # 이유와 같다(`models/saju_order.py`). 없는 신원을 지어내지 않는다.
+        user_id=None,
+        session_id=f"saju:{uuid4()}",
+    ):
+        return await _ask_report_llm_inner(system, user)
+
+
+async def _ask_report_llm_inner(system: str, user: str) -> str:
     try:
         return await ask_text(system_prompt=system, user_content=user)
     except LLMRefusedError as exc:

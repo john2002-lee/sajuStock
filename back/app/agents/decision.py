@@ -4,6 +4,7 @@ import json
 import logging
 
 from app.agents.prompts import DECISION_PROFILE
+from app.integrations import amplitude
 from app.integrations.llm import ask_structured
 from app.schemas.advice import AgentOpinion, InvestmentDecision
 from app.schemas.rag import RetrievedDoc
@@ -133,8 +134,12 @@ async def decide(
     """
     context = _decision_context(stock_data, metrics, opinions, fundamentals, documents)
 
+    # analysts.py 와 같은 이유로 여기 있다 — 두 경로가 다 지나는 유일한 지점이다.
     try:
-        decision = await ask_structured(DECISION_PROFILE.full_prompt(), context, InvestmentDecision)
+        async with amplitude.child(DECISION_PROFILE.key):
+            decision = await ask_structured(
+                DECISION_PROFILE.full_prompt(), context, InvestmentDecision
+            )
     except Exception as exc:
         logger.warning("최종 판단 에이전트 실패 (%s) → 규칙 기반 판단으로 대체", exc)
         return fallback_decision(metrics), True

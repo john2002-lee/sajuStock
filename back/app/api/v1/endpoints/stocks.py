@@ -18,6 +18,7 @@ from app.api.deps import (
 )
 from app.api.sse import sse_with_heartbeat
 from app.core.config import settings
+from app.integrations import amplitude
 from app.schemas.advice import StockAdviceRequest, StockAdviceResponse
 from app.schemas.stock import (
     ListedCompaniesStatus,
@@ -123,6 +124,19 @@ async def get_listed_companies_status(repo: ListedCompanyRepo) -> ListedCompanie
     return await listed_company_service.get_status(repo)
 
 
+def _advice_session_id(owner: str | None, symbol: str) -> str:
+    """이 종목에 대한 이 사람의 판단 대화 하나를 가리키는 ID.
+
+    Agent Analytics 는 `session_id` 로 턴을 이어 붙인다. 요청마다 새 UUID 를 주면
+    **모든 판단이 각각 1턴짜리 대화**가 되어 "같은 종목을 몇 번 다시 물었나" 가
+    보이지 않는다 — 이 앱에서 가장 궁금한 질문이 바로 그것이다.
+
+    앱에 스레드 개념이 없으므로 (소유자, 종목) 을 그 자리에 쓴다. 비로그인은
+    `anon` 으로 묶이는데, 그 구간은 어차피 개인을 구분하지 않는 것이 맞다.
+    """
+    return f"advice:{owner or 'anon'}:{symbol}"
+
+
 @router.post("/advice", response_model=StockAdviceResponse, summary="AI 멀티 에이전트 판단")
 async def create_stock_advice(
     repo: ListedCompanyRepo,
@@ -140,9 +154,14 @@ async def create_stock_advice(
     profile = await profile_service.get_profile(profiles, owner) if owner else None
     try:
         async with advice_cache.reserve_slot():
-            return await advice_service.generate_advice(
-                payload.symbol, listing=listing, profile=profile
-            )
+            async with amplitude.session(
+                amplitude.STOCK_ADVICE,
+                user_id=owner,
+                session_id=_advice_session_id(owner, payload.symbol),
+            ):
+                return await advice_service.generate_advice(
+                    payload.symbol, listing=listing, profile=profile
+                )
     except advice_cache.AdviceBusyError as exc:
         raise _busy(exc) from exc
 
@@ -200,9 +219,17 @@ async def stream_stock_advice(
     # 근거를 `api/sse.py` 파일 주석 ②에 적어 두었다.
     return StreamingResponse(
         sse_with_heartbeat(
-            # 모듈 속성으로 부르는 형태를 유지한다 — 테스트가 이 속성을 갈아끼운다.
-            advice_stream.stream_advice(
-                payload.symbol, listing=listing, profile=profile
+            # 세션은 스트림이 **다 소비될 때까지** 열려 있어야 한다. 이 함수는
+            # StreamingResponse 를 즉시 반환하므로 여기서 `async with` 를 쓰면
+            # LLM 호출이 일어나기 전에 닫힌다 (`integrations/amplitude`).
+            amplitude.stream_within(
+                amplitude.STOCK_ADVICE,
+                user_id=owner,
+                session_id=_advice_session_id(owner, payload.symbol),
+                # 모듈 속성으로 부르는 형태를 유지한다 — 테스트가 이 속성을 갈아끼운다.
+                source=advice_stream.stream_advice(
+                    payload.symbol, listing=listing, profile=profile
+                ),
             ),
             heartbeat_seconds=settings.advice_heartbeat_seconds,
             # 소비자가 중간에 끊어도 반드시 반납한다. 안 그러면 사용자가 드로어를

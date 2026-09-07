@@ -14,6 +14,7 @@ from app.core.database import create_all, dispose_engine
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.vector_database import dispose_vector_engine
+from app.integrations import amplitude
 from app.integrations.llm import close_client
 from app.repositories.listed_company import ListedCompanyRepository
 from app.services import listed_company_service, market_service
@@ -63,6 +64,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await create_all()
     logger.info("%s 시작 (model=%s)", settings.app_name, settings.gemini_model)
 
+    # 계측이 꺼진 채로 도는 것은 정상이지만, **모르는 채로** 꺼져 있는 것은 아니다.
+    # 위의 ADVICE_API_KEY·KRX 안내와 같은 자세로 매 기동마다 말한다.
+    if not amplitude.ENABLED:
+        logger.info(
+            "AMPLITUDE_AI_API_KEY 가 없어 Agent Analytics 계측이 꺼져 있습니다 "
+            "— AI 판단·사주 리포트는 평소대로 동작합니다"
+        )
+
     # 조용히 열려 있는 것이 가장 나쁘다 — 자물쇠가 꺼져 있으면 매 기동마다 말한다.
     if not settings.advice_auth_enabled:
         logger.warning(
@@ -86,6 +95,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     # 아직 도는 중이면 접는다 — 종료를 외부 API 응답만큼 기다릴 이유가 없다.
     warm_up.cancel()
+    # LLM 클라이언트를 버리기 전에 보낸다 — 순서가 바뀌어도 동작은 같지만,
+    # "남은 것을 비우고 나서 닫는다" 가 읽기 쉽다.
+    await amplitude.shutdown()
     await close_client()
     await dispose_engine()
     await dispose_vector_engine()

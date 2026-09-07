@@ -263,18 +263,20 @@ async def rewrite_query(state: AdviceState) -> dict:
     stock_data = state["stock_data"]
     assert stock_data is not None
 
+    from app.integrations import amplitude
     from app.integrations.llm import ask_text
 
     previous = state["query"]
     try:
-        rewritten = await ask_text(
-            "너는 검색 질의를 고쳐 쓰는 도구다. 설명 없이 질의 문장 하나만 출력해라.",
-            f"종목: {stock_data.name}({stock_data.symbol})\n"
-            f"직전 질의: {previous}\n"
-            "이 질의로 검색했더니 관련 문서가 거의 없었다. "
-            "같은 종목의 뉴스·리포트를 더 잘 찾도록 어휘를 바꿔 다시 써라. "
-            "회사명·사업 영역·업종 용어를 섞고, 문장 하나로 만들어라.",
-        )
+        async with amplitude.child("query-rewriter"):
+            rewritten = await ask_text(
+                "너는 검색 질의를 고쳐 쓰는 도구다. 설명 없이 질의 문장 하나만 출력해라.",
+                f"종목: {stock_data.name}({stock_data.symbol})\n"
+                f"직전 질의: {previous}\n"
+                "이 질의로 검색했더니 관련 문서가 거의 없었다. "
+                "같은 종목의 뉴스·리포트를 더 잘 찾도록 어휘를 바꿔 다시 써라. "
+                "회사명·사업 영역·업종 용어를 섞고, 문장 하나로 만들어라.",
+            )
     except Exception as exc:  # noqa: BLE001 - 재작성 실패가 판단 실패가 되면 안 된다
         logger.warning("질의 재작성 실패 (%s) → 직전 질의 유지", exc)
         return {}
@@ -305,6 +307,9 @@ async def _run_analyst(state: AdviceState, profile: AgentProfile) -> dict:
     반환이 **리스트 하나**인 것이 중요하다 — 상태의 `opinions` 에 리듀서(`operator.add`)가
     걸려 있어 셋이 이어 붙는다. dict 하나를 그냥 반환하면 마지막 것만 남는다.
     """
+    # 자식 에이전트 위임은 `agents/analysts._invoke` 가 한다 — 이 그래프를 타지
+    # 않는 `POST /stocks/advice` 도 같은 함수를 지나기 때문이다. 여기서 한 번 더
+    # 감싸면 위임이 이중으로 쌓인다.
     opinion = await invoke_one(
         profile, _context_of(state), state["metrics"], state.get("documents")
     )
@@ -328,6 +333,7 @@ async def analyst(state: AdviceState) -> dict:
 
 async def decide(state: AdviceState) -> dict:
     """의견 셋을 모아 최종 판단. 실패는 규칙 기반으로 접는다 (`agents/decision`)."""
+    # 위임은 `agents/decision.run_decision` 안에 있다 (`_run_analyst` 와 같은 이유).
     decision, used_fallback = await run_decision(
         state["stock_data"],
         state["metrics"],

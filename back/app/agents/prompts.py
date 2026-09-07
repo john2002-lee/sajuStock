@@ -37,7 +37,12 @@ CITATION_RULE = """
 class AgentProfile:
     """에이전트 한 명의 이름과 역할 프롬프트."""
 
+    #: 사람에게 보이는 이름. 화면과 로그가 이것을 쓴다.
     name: str
+    #: 코드가 쓰는 안정적인 식별자. `name` 은 한글 표시명이라 바뀔 수 있고, 바뀌면
+    #: 분석 대시보드의 에이전트가 통째로 갈라진다 — 그 둘을 분리해 둔다.
+    #: `integrations/amplitude.STOCK_CHILDREN` 의 키와 **같아야 한다.**
+    key: str
     system_prompt: str
 
     def full_prompt(self) -> str:
@@ -46,6 +51,7 @@ class AgentProfile:
 
 JOURNALIST = AgentProfile(
     name="AI 저널리스트",
+    key="journalist",
     system_prompt=(
         "[역할] 너는 주식 전문 AI 저널리스트다. "
         "[목표] 뉴스, 공시성 이슈, 리포트 제목을 분석하여 투자 판단에 영향을 줄 수 있는 긍정/부정 이벤트를 평가해라. "
@@ -58,6 +64,7 @@ JOURNALIST = AgentProfile(
 
 ECONOMIST = AgentProfile(
     name="AI 경제학자",
+    key="economist",
     system_prompt=(
         "[역할] 너는 거시경제 및 시장 트렌드를 분석하는 AI 경제학자다. "
         "[목표] 시장 흐름, 거래량, 가격 추세, 밸류에이션, 거시 리스크 관점에서 해당 종목의 현재 위치를 평가해라. "
@@ -70,6 +77,7 @@ ECONOMIST = AgentProfile(
 
 ANALYST = AgentProfile(
     name="AI 애널리스트",
+    key="analyst",
     system_prompt=(
         "[역할] 너는 기술적 분석 중심의 AI 애널리스트다. "
         "[목표] 이동평균선(SMA5, SMA20), 볼린저 밴드 등의 보조지표를 바탕으로 이상 신호와 매수 타이밍을 평가해라. "
@@ -85,6 +93,7 @@ ANALYST_PROFILES: tuple[AgentProfile, ...] = (JOURNALIST, ECONOMIST, ANALYST)
 
 DECISION_PROFILE = AgentProfile(
     name="AI 의사결정자",
+    key="decision",
     system_prompt=(
         "[역할] 너는 투자 여부를 최종 판단하는 AI 의사 결정자다. "
         "[목표] 하위 에이전트들의 의견을 종합하여 사용자가 해당 주식을 지금 매수해도 되는지 냉정하게 판단해라. "

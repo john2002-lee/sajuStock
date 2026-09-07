@@ -150,7 +150,37 @@ if ($pools -notcontains $Pool) {
 # 된다. 조건에 공백을 넣지 않는다 — Windows 의 gcloud.cmd 배치 래퍼를 지나갈 때
 # 인자 분리로 깨지는 것을 피한다 (CEL 은 `==` 주변 공백을 요구하지 않는다).
 $mapping = "google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref"
-$condition = "assertion.repository=='$Repo'"
+
+# **브랜치 제한이 여기 있다** (아래 6번의 바인딩이 아니라).
+#
+# 처음에는 서비스 계정 바인딩 쪽에 `principal://.../subject/` 로 주체 하나를
+# 못박고, 조건은 저장소만 봤다. 그것이 토큰 교환 단계에서
+# `iam.serviceAccounts.getAccessToken denied` / `Unable to acquire impersonated
+# credentials` 로 죽었다 — GitHub 의 `sub` 는 `repo:owner/name:ref:refs/heads/main`
+# 처럼 `/` 와 `:` 가 섞여 있고, 그 문자열을 `principal://.../subject/` 자리에 넣으면
+# 바인딩이 실제 주체와 맞지 않는다. Google 의 GitHub Actions 문서가 이 자리에
+# 예외 없이 `principalSet://.../attribute.repository/...` 를 쓰는 이유다.
+#
+# 그래서 좁히는 일을 조건이 맡는다. 저장소와 **브랜치** 를 둘 다 여기서 본다 —
+# 포크의 PR(`refs/pull/N/merge`), 다른 브랜치, 태그는 풀에 들어오지 못한다.
+# 보안 범위는 예전과 같고, 지키는 자리만 바뀌었다.
+#
+# **`&&` 를 쓰지 않는다.** 두 조건을 `A&&B` 로 이어 봤더니 이렇게 됐다:
+#
+#   Updated workload identity pool provider [github-actions].
+#   'assertion.ref' is not recognized as an internal or external command
+#
+# `gcloud` 는 Windows 에서 **배치 파일**(`gcloud.cmd`)이고, cmd.exe 는 인자 안의
+# `&&` 를 명령 구분자로 읽는다. 그래서 조건의 앞 절반만 저장되고(=브랜치 제한이
+# 조용히 사라지고) 뒷 절반은 명령으로 실행됐다. 인자에 공백이 없으면 PowerShell 이
+# 따옴표를 붙이지 않아 cmd 가 그대로 본다.
+#
+# 두 절을 문자열 하나로 이어 **등식 하나** 로 만들면 `&&` 가 아예 없어진다.
+# CEL 은 문자열 `+` 를 지원하고, 작은따옴표 리터럴도 받는다 — 큰따옴표를 피하는
+# 것도 같은 이유다(cmd 를 지나가야 한다).
+#
+# 남은 문자는 letters `.` `+` `'` `@` `/` `:` `=` 뿐이고 cmd 메타문자가 없다.
+$condition = "assertion.repository+'@'+assertion.ref=='$Repo@refs/heads/$Branch'"
 
 Write-Host "== OIDC 프로바이더: $Provider" -ForegroundColor Cyan
 
@@ -174,15 +204,16 @@ Invoke-GcloudOrDie -What "providers $verb" -GcArgs @("iam","workload-identity-po
   "--attribute-condition=$condition",
   "--display-name=GitHub Actions OIDC")
 
-# --- 6. 주체 하나만 배포 SA 를 쓰게 묶는다 ----------------------------------
-# GitHub 의 `sub` 클레임 형식이 그대로 들어간다. `principalSet://.../attribute.*` 가
-# 아니라 `principal://.../subject/` 인 것이 핵심이다 — 전자는 집합(브랜치 전체 등),
-# 후자는 **정확히 이 하나** 다.
-$subject = "repo:${Repo}:ref:refs/heads/$Branch"
-$member  = "principal://iam.googleapis.com/projects/$num/locations/global/workloadIdentityPools/$Pool/subject/$subject"
+# --- 6. 이 저장소만 배포 SA 를 쓰게 묶는다 ----------------------------------
+# `attribute.repository` 로 묶는다. 브랜치는 위 5번의 프로바이더 조건이 이미
+# 걸렀으므로, 이 풀에 들어온 것 중 이 저장소인 것 = main 의 워크플로 뿐이다.
+#
+# 주의: 이 풀에 **조건 없는 프로바이더를 나중에 추가하면** 이 바인딩이 넓어진다.
+# 프로바이더를 더 만들 일이 생기면 각자 조건을 걸거나 풀을 따로 쓴다.
+$member = "principalSet://iam.googleapis.com/projects/$num/locations/global/workloadIdentityPools/$Pool/attribute.repository/$Repo"
 
-Write-Host "== 배포 허용 주체" -ForegroundColor Cyan
-Write-Host "   $subject" -ForegroundColor Green
+Write-Host "== 배포 허용 범위" -ForegroundColor Cyan
+Write-Host "   저장소 $Repo · 브랜치 refs/heads/$Branch (조건에서 제한)" -ForegroundColor Green
 Invoke-GcloudOrDie -Quiet -What "workloadIdentityUser 바인딩" -GcArgs @(
   "iam","service-accounts","add-iam-policy-binding",$deployerEmail,
   "--member=$member","--role=roles/iam.workloadIdentityUser",

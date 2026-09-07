@@ -89,3 +89,54 @@ Last Updated: 2026-09-07 (첫 실행 실패 분석 반영)
 `auth`/`setup-gcloud` 에 `project_id` 를 넘긴다. 없으면 액션이
 `CLOUDSDK_CORE_PROJECT` 를 export 하지 않고, WIF 외부 계정 자격증명은 일부 API
 호출에서 그 값을 쿼터 프로젝트로 쓴다.
+
+## 두 번째 실행 실패 — **진짜 근본 원인** (run 34093679072)
+
+`setup-gcloud` 가 죽었고, 그 메시지가 처음부터의 원인을 그대로 말해 줬다:
+
+    'Unable to acquire impersonated credentials'
+    Permission 'iam.serviceAccounts.getAccessToken' denied on resource
+
+즉 **WIF 토큰 교환 자체가 한 번도 성공한 적이 없었다.** 첫 실행에서
+`gcloud secrets list` 가 빈 결과였던 것도 이것이었다 — `auth` 액션은
+`create_credentials_file` 로 파일만 쓰고 교환은 첫 API 호출 때 일어나므로,
+"auth 성공" 은 교환 성공을 뜻하지 않는다. `project_id` 를 넘긴 것이 결과적으로
+도움이 됐다: `setup-gcloud` 가 더 이른 시점에 API 를 호출해 원인을 드러냈다.
+
+### 원인
+
+서비스 계정 바인딩을 `principal://.../subject/repo:owner/name:ref:refs/heads/main`
+로 걸었다. GitHub 의 `sub` 는 `/` 와 `:` 가 섞인 문자열이고, 그것을
+`principal://.../subject/` 자리에 넣으면 실제 주체와 맞지 않는다.
+`roles/iam.workloadIdentityUser` 는 `getAccessToken` 을 포함하므로 **역할은 맞았고,
+주체가 안 맞았다** — 그래서 에러가 권한 문제처럼만 보였다.
+
+Google 의 GitHub Actions 문서가 이 자리에 예외 없이
+`principalSet://.../attribute.repository/OWNER/REPO` 를 쓰는 이유다.
+
+### 고친 방법 (보안 등가)
+
+  * 바인딩 → `principalSet://.../attribute.repository/john2002-lee/sajuStock`
+  * 브랜치 제한 → **프로바이더 조건으로 이동.** 저장소와 ref 를 둘 다 본다.
+  * 옛 `principal://.../subject/` 바인딩은 제거했다 (스크립트도 더는 만들지 않는다).
+
+남은 주의: 이 풀에 조건 없는 프로바이더를 추가하면 바인딩이 넓어진다.
+
+### 그 과정에서 만난 세 번째 함정 — cmd.exe
+
+조건을 `A&&B` 로 이었더니:
+
+    Updated workload identity pool provider [github-actions].
+    'assertion.ref' is not recognized as an internal or external command
+
+`gcloud` 는 Windows 에서 배치 파일(`gcloud.cmd`)이고 cmd.exe 가 인자 안의 `&&` 를
+명령 구분자로 읽는다. **조건의 앞 절반만 저장돼 브랜치 제한이 조용히 사라졌다** —
+성공 메시지까지 찍혀서 눈치채기 어려웠다. 인자에 공백이 없으면 PowerShell 이
+따옴표를 붙이지 않아 cmd 가 그대로 본다.
+
+그래서 두 절을 문자열 하나로 이어 등식 하나로 만들었다:
+
+    assertion.repository+'@'+assertion.ref=='john2002-lee/sajuStock@refs/heads/main'
+
+`&&` 가 없고, 남은 문자에 cmd 메타문자가 없다. 큰따옴표 대신 작은따옴표를 쓴 것도
+같은 이유다. **저장된 값은 gcloud 출력이 아니라 `providers describe` 로 확인했다.**

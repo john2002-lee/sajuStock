@@ -27,7 +27,7 @@ import { SUPPORT_EMAIL } from "@/lib/config/public";
 
 export const metadata: Metadata = {
   title: "이용약관",
-  description: "종목 원장 서비스 이용약관 · 환불 정책 · 사업자 정보",
+  description: "FEEL 서비스 이용약관 · 환불 정책 · 사업자 정보",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -49,7 +49,7 @@ export default function TermsOfServicePage() {
 
       <Section title="제1조 (목적)">
         <p>
-          이 약관은 종목 원장(이하 &ldquo;서비스&rdquo;)이 제공하는 주식 정보 서비스와
+          이 약관은 FEEL(이하 &ldquo;서비스&rdquo;)이 제공하는 주식 정보 서비스와
           사주팔자 계산·리포트 서비스의 이용과 관련하여 서비스와 이용자 간의 권리·의무
           및 책임사항을 정함을 목적으로 합니다.
         </p>

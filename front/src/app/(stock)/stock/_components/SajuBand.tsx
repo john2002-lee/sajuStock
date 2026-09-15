@@ -1,10 +1,10 @@
 import Link from "next/link";
 
 /**
- * 시장 현황(`/stock`)에서 사주 서비스로 건너가는 입구 — **서비스 간 다리다.**
+ * 시장 현황(`/stock`)에서 사주로 건너가는 입구 — **서비스 간 다리다.**
  *
- * 서비스 선택 화면(`/`)과 푸터의 서비스 이동 줄이 같은 곳으로 가므로 유일한 길은
- * 아니지만, **주식을 보던 중에** 건너가는 길은 여전히 이것 하나다.
+ * 서비스 선택 화면과 푸터의 이동 줄이 사라지면서, 주식 화면에서 사주로 건너가는
+ * 길은 이제 **정말로 이것 하나**다. 사주가 루트로 올라왔으므로 목적지는 `/` 다.
  *
  * ## 문구가 성향에서 사주로 바뀐 이유
  *
@@ -22,7 +22,7 @@ import Link from "next/link";
 export function SajuBand() {
   return (
     <Link
-      href="/saju"
+      href="/"
       className="group flex items-center justify-between gap-4 border border-line-20 bg-surface px-4 py-4 hover:border-ink md:px-5"
     >
       <div className="space-y-1">

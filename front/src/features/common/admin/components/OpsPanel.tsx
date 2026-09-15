@@ -1,6 +1,11 @@
 import { count as fmtCount, stamp } from "@/lib/format";
 import { Notice } from "@/shared/components/feedback";
-import { batchLabel, type BatchStatus, type OpsSnapshot } from "../model/types";
+import {
+  batchLabel,
+  type BatchStatus,
+  type OpsSnapshot,
+  type TokenTotals,
+} from "../model/types";
 
 export interface OpsPanelProps {
   ops: OpsSnapshot;
@@ -64,6 +69,85 @@ export function OpsPanel({ ops }: OpsPanelProps) {
           캐시는 프로세스 메모리에 있습니다. <strong>누적 사용량이 아니라 현재
           상태</strong>이고, 서버를 재시작하면 0 이 됩니다.
         </p>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        <SectionTitle>AI 토큰 사용량</SectionTitle>
+        {/* 위 "AI 판단" 과 **다른 질문**에 답한다 — 그쪽은 재시작하면 0 이 되는 현재
+            상태고, 이쪽은 DB(`llm_usage_days`)에 쌓이는 누적이다.
+
+            **예산·잔여는 없다.** Gemini API 가 잔여 할당량을 응답으로 주지 않고, 이
+            제품은 월 예산을 두지 않기로 했다(2026-09-14). 없는 숫자를 추정해 보여주는
+            것보다 쓴 만큼만 말하는 편이 정직하다. */}
+        {ops.tokenUsage.startedOn ? (
+          <>
+            <UsageRow label="오늘" totals={ops.tokenUsage.today} />
+            <UsageRow label="이번 달" totals={ops.tokenUsage.month} />
+            <UsageRow label="누적" totals={ops.tokenUsage.total} />
+
+            {/* 입력·출력·사고를 나눠 적는 이유: **사고 토큰이 출력과 같은 단가로
+                과금된다.** 실측에서 medium 은 사고가 과금 출력의 절반을 넘었고,
+                합계 한 칸만 보면 그 사실이 화면에서 사라진다. */}
+            <p className="num text-muted-45" style={{ fontSize: 10, lineHeight: 1.6 }}>
+              누적 구성 · 입력 {fmtCount(ops.tokenUsage.total.inputTokens)} · 출력{" "}
+              {fmtCount(ops.tokenUsage.total.outputTokens)} · 사고{" "}
+              {fmtCount(ops.tokenUsage.total.reasoningTokens)}
+            </p>
+
+            {ops.tokenUsage.byModel.length > 0 ? (
+              <div className="flex flex-col gap-1 pt-1">
+                {/* 모델마다 단가가 10배 넘게 다르다 — 합계만으로는 비용을 못 읽는다 */}
+                <span
+                  className="font-mono uppercase tracking-label text-muted-45"
+                  style={{ fontSize: 9.5 }}
+                >
+                  모델별 누적
+                </span>
+                {ops.tokenUsage.byModel.map((row) => (
+                  <div
+                    key={row.model}
+                    className="flex items-baseline justify-between gap-3"
+                  >
+                    <span className="num truncate" style={{ fontSize: 11.5 }}>
+                      {row.model}
+                    </span>
+                    <span
+                      className="num flex-none text-muted-60"
+                      style={{ fontSize: 11 }}
+                    >
+                      {fmtCount(row.totals.totalTokens)} · 호출{" "}
+                      {fmtCount(row.totals.calls)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {/* **언제부터의 누적인지 밝힌다.** 과거 사용량은 채우지 않았다(Amplitude
+                로만 나갔고 되돌아가 채울 원본이 없다). 이 줄이 없으면 "누적" 이
+                서비스 개시부터인 것처럼 읽힌다. */}
+            <p className="num text-muted-45" style={{ fontSize: 10, lineHeight: 1.6 }}>
+              {ops.tokenUsage.startedOn} 집계 시작 · 마지막 사용{" "}
+              {when(ops.tokenUsage.lastUsedAt)}
+            </p>
+
+            {/* **임베딩은 빠져 있다.** RAG 색인·검색이 쓰는 `embed_content` 는 토큰
+                수를 주지 않는다(과금 단위가 문자다). 빠졌다는 사실을 적지 않으면
+                이 숫자가 LLM 지출 전부인 것으로 읽힌다. */}
+            <p className="text-muted-45" style={{ fontSize: 10, lineHeight: 1.6 }}>
+              생성 호출만 셉니다 — RAG 임베딩은 토큰 수가 제공되지 않아 빠져 있습니다.
+            </p>
+          </>
+        ) : (
+          /* 세 경우가 여기로 온다 — 호출이 없었거나, 스키마가 아직 없거나(그때
+             백엔드가 0 으로 접어 준다), 백엔드가 이 필드를 모르는 예전 버전이거나.
+             구분해 말하지 않으면 엉뚱한 처방(`alembic upgrade head`)을 하게 된다. */
+          <p className="text-muted-45" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
+            아직 기록이 없습니다. 마이그레이션 이후 LLM 호출이 없었거나, 스키마가
+            적용되지 않았거나(<code>alembic upgrade head</code>), 백엔드가 이 항목을
+            아직 내려주지 않는 버전입니다.
+          </p>
+        )}
       </div>
 
       {/* 꺼져 있는 자물쇠는 **경고로** 보여야 한다. 조용히 열려 있는 것이 가장 나쁘다 */}
@@ -134,6 +218,24 @@ function Stat({ label, value }: { label: string; value: string }) {
         {value}
       </span>
     </span>
+  );
+}
+
+/**
+ * 한 구간의 토큰 사용량 한 줄.
+ *
+ * `Coverage` 와 같은 좌우 배치다 — 왼쪽이 무엇인지, 오른쪽이 얼마인지. 막대가 없는
+ * 것은 **분모가 없기 때문**이다. 예산을 두지 않기로 했으므로 채울 대상이 없고,
+ * 그 상태에서 막대를 그리면 있지도 않은 상한을 암시하게 된다.
+ */
+function UsageRow({ label, totals }: { label: string; totals: TokenTotals }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-t border-dotted border-line-22 pt-2">
+      <span style={{ fontSize: 12.5 }}>{label}</span>
+      <span className="num text-muted-60" style={{ fontSize: 11.5 }}>
+        {fmtCount(totals.totalTokens)} 토큰 · 호출 {fmtCount(totals.calls)}
+      </span>
+    </div>
   );
 }
 

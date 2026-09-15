@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     profile,
     saju,
     stocks,
+    visits,
     watchlist,
 )
 
@@ -21,6 +22,9 @@ api_router.include_router(advice_verdicts.router)
 api_router.include_router(markets.router)
 api_router.include_router(watchlist.router)
 api_router.include_router(profile.router)
+# 접속 기록은 **일반 사용자 경로**다 — 모든 방문자가 부르고 관리자 키가 없다.
+# 조회(`GET /admin/visits`)만 아래 관리자 라우터에 있다 (endpoints/visits.py 주석).
+api_router.include_router(visits.router)
 # 사주 라우터는 **아무것도 저장하지 않는다** — 소유자 헤더도 받지 않는다
 # (endpoints/saju.py 모듈 주석). 저장은 사용자가 보정을 끝낸 뒤 `/profile` 이 받는다.
 api_router.include_router(saju.router)

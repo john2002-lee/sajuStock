@@ -23,6 +23,7 @@ import {
   BiRefresh,
   BiRightArrowAlt,
   BiSearch,
+  BiShareAlt,
   BiSolidStar,
   BiSortDown,
   BiStar,
@@ -52,6 +53,7 @@ import type { IconType } from "react-icons";
  */
 const REGISTRY = {
   search: BiSearch,
+  share: BiShareAlt,
   close: BiX,
   home: BiHome,
   star: BiStar,

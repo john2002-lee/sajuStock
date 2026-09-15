@@ -11,18 +11,23 @@ export {
   fetchOps,
   fetchUser,
   fetchUsers,
+  fetchVisits,
   updateRole,
 } from "./services/adminApi";
 
 export { OpsPanel, type OpsPanelProps } from "./components/OpsPanel";
 export { AuditList, type AuditListProps } from "./components/AuditList";
 export { RoleBadge, UserTable, type UserTableProps } from "./components/UserTable";
+export { VisitPanel, type VisitPanelProps } from "./components/VisitPanel";
 
 export { actionLabel } from "./model/types";
 export type {
   AdminUser,
   AdminUserPage,
   AuditEntry,
+  DailyVisitPoint,
+  MemberVisit,
   OpsSnapshot,
   Role,
+  VisitStats,
 } from "./model/types";

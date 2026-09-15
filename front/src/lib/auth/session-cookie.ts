@@ -52,6 +52,55 @@ export const SESSION_COOKIE_NAMES = [
  */
 export const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
 
+/**
+ * jose 가 만료된 JWT 에 붙이는 코드. 클래스 이름(`JWTExpired`)이 아니라 이 값을 보는
+ * 이유는, 번들러가 클래스 이름을 줄여도 `code` 는 문자열 리터럴이라 살아남기 때문이다.
+ */
+const JOSE_EXPIRED = "ERR_JWT_EXPIRED";
+
+/** Auth.js 가 세션 복호화 실패에 붙이는 타입. */
+const SESSION_DECODE_FAILED = "JWTSessionError";
+
+/**
+ * 이 오류가 **수명이 다한 세션 쿠키**인가.
+ *
+ * ## 왜 판정이 필요한가
+ *
+ * 토큰 수명은 8시간인데 쿠키는 브라우저를 닫을 때까지 남는다(위 두 상수). 그래서
+ * **브라우저를 하루 켜 둔 사람**은 만료된 토큰을 계속 보내고, Auth.js 는 그때마다
+ * `JWTSessionError` 를 ERROR 로 세 줄 남긴다 — `[auth][error]`·`[auth][cause]`(스택)
+ * ·`[auth][details]`. 매 요청이다.
+ *
+ * 그런데 이것은 **오류가 아니라 설계대로 일어난 일**이다. 화면도 정상으로 동작한다
+ * (세션을 `null` 로 보고 로그아웃 상태를 그린다). 정상적인 사건이 진짜 오류와 같은
+ * 높이로 쌓이면 로그에서 진짜를 못 찾는다.
+ *
+ * ## 로그에 개인정보가 실린다
+ *
+ * `[auth][details]` 는 디코드하려던 **JWT 페이로드를 통째로** 찍는다 — 이름·이메일·
+ * 구글 프로필 사진 주소가 서버 로그에 남는다. 이 저장소는 계측에서도 그런 값을
+ * 빼기로 했다(`back/app/integrations/amplitude.py`). 같은 기준을 로그에도 적용한다.
+ *
+ * ## 판정을 좁게 잡는다
+ *
+ * 세션 복호화 실패(`JWTSessionError`)이면서 원인이 **만료**인 경우만이다. 서명이
+ * 안 맞거나(`AUTH_SECRET` 교체) 형식이 깨진 토큰은 그대로 ERROR 로 남아야 한다 —
+ * 그쪽은 실제로 무언가 잘못된 것이다.
+ */
+export function isExpiredSessionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  if ((error as { type?: unknown }).type !== SESSION_DECODE_FAILED) return false;
+
+  // Auth.js 는 원인을 `cause.err` 에 넣고 나머지 키를 메타데이터로 쓴다.
+  const cause = (error as { cause?: unknown }).cause;
+  if (!cause || typeof cause !== "object") return false;
+
+  const inner = (cause as { err?: unknown }).err;
+  if (!inner || typeof inner !== "object") return false;
+
+  return (inner as { code?: unknown }).code === JOSE_EXPIRED;
+}
+
 function cookieName(setCookie: string): string {
   const eq = setCookie.indexOf("=");
   return (eq === -1 ? setCookie : setCookie.slice(0, eq)).trim();

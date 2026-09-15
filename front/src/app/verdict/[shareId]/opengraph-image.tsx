@@ -114,7 +114,7 @@ export default async function Image({
         </div>
 
         <div style={{ display: "flex", fontSize: 26, color: "#6b7280", letterSpacing: 3 }}>
-          THE STOCK LEDGER · 투자 권유가 아닙니다
+          FEEL · 투자 권유가 아닙니다
         </div>
       </div>
     ),

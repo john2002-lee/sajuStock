@@ -15,9 +15,9 @@ from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.vector_database import dispose_vector_engine
 from app.integrations import amplitude
-from app.integrations.llm import close_client
+from app.integrations.llm import close_client, set_usage_sink
 from app.repositories.listed_company import ListedCompanyRepository
-from app.services import listed_company_service, market_service
+from app.services import listed_company_service, llm_usage_service, market_service
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,11 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             settings.market_cap_batch_limit,
         )
 
+    # 토큰 사용량의 도착지를 여기서 꽂는다. **합성 루트가 하는 일이다** —
+    # `integrations/llm.py` 는 저장소를 import 할 수 없고(계층이 뒤집힌다), 그래서
+    # "누가 받아 가는지" 를 아는 자리는 애플리케이션을 조립하는 이 파일뿐이다.
+    set_usage_sink(llm_usage_service.record)
+
     warm_up = asyncio.create_task(_warm_up())
 
     yield
@@ -98,6 +103,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # LLM 클라이언트를 버리기 전에 보낸다 — 순서가 바뀌어도 동작은 같지만,
     # "남은 것을 비우고 나서 닫는다" 가 읽기 쉽다.
     await amplitude.shutdown()
+    # 엔진을 버리기 전에 싱크를 뗀다. 종료 중에 늦게 끝난 호출이 이미 닫힌
+    # 세션 팩토리로 내려가면 로그가 종료 소음으로 뒤덮인다.
+    set_usage_sink(None)
     await close_client()
     await dispose_engine()
     await dispose_vector_engine()

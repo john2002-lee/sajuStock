@@ -73,6 +73,70 @@ class AuditPage(BaseModel):
     total: int = 0
 
 
+class DailyVisitPoint(BaseModel):
+    """추이 그래프의 한 칸. **방문이 0 인 날도 온다.**
+
+    DB 는 행이 있는 날만 아는데, 빈 날을 서버가 채워 보내지 않으면 화면이
+    "조회가 안 된 날" 과 "아무도 안 온 날" 을 구분할 수 없다. 축은 서버가 세운다.
+    """
+
+    #: KST 기준 날짜 (ISO `YYYY-MM-DD`)
+    day: str
+    visitors: int = 0
+
+
+class MemberVisit(BaseModel):
+    """회원 한 명의 접속 요약."""
+
+    user_id: str
+    email: str | None = None
+    name: str | None = None
+    #: 방문한 **날 수**. 승인된 정의(하루 1회)에서 이것이 접속수다
+    visit_count: int = 0
+    #: 최근 접속일시(ISO). 이 화면의 핵심 값이다
+    last_seen_at: str | None = None
+    first_seen_at: str | None = None
+
+
+class VisitStats(BaseModel):
+    """`GET /admin/visits` 응답.
+
+    ## 익명과 회원을 나눠 담는 이유
+
+    승인된 접속 정의가 "익명 포함" 이라 `total_visitors` 에는 둘이 섞여 있다.
+    구성을 함께 주지 않으면 화면이 3,000 이라는 숫자만 내놓고, 보는 사람은 그것이
+    회원 3,000명인지 브라우저 3,000개인지 알 수 없다. 사주 서비스는 회원가입을
+    받지 않으므로 실제로는 익명이 대부분이다.
+
+    ## 총 방문일을 함께 주는 이유
+
+    `total_visitors` 만으로는 재방문이 있었는지 알 수 없다. 방문자 1,000명·방문일
+    1,000건이면 아무도 두 번 오지 않았다는 뜻이고, 그건 접속자수와 전혀 다른 신호다.
+    """
+
+    #: 서로 다른 방문자 수 (익명 + 회원)
+    total_visitors: int = 0
+    #: 방문일의 합. `total_visitors` 보다 크면 재방문이 있었다
+    total_visit_days: int = 0
+    anon_visitors: int = 0
+    member_visitors: int = 0
+
+    #: 오늘(KST) 접속자수
+    today_visitors: int = 0
+    #: 기준 날짜(KST, ISO). 화면이 "어느 날의 오늘인가" 를 밝힐 수 있게 함께 준다 —
+    #: UTC 로 계산됐는지 KST 로 계산됐는지가 이 값으로 드러난다
+    today: str
+
+    #: 최신이 먼저. 빈 날 포함
+    daily: list[DailyVisitPoint] = Field(default_factory=list)
+
+    members: list[MemberVisit] = Field(default_factory=list)
+    #: 접속 기록이 있는 회원 수. `members` 는 페이지이고 이것이 전체다
+    member_total: int = 0
+
+    generated_at: str
+
+
 class BatchStatus(BaseModel):
     """배치 하나의 최근 상태. `batch_runs` 두 질의를 합친 것이다.
 
@@ -93,6 +157,53 @@ class BatchStatus(BaseModel):
     #: 가장 최근 실패. 지금이 정상이어도 남는다 — 되풀이되는 실패를 보려면 필요하다
     last_failure_at: str | None = None
     last_failure_detail: str | None = None
+
+
+class TokenTotals(BaseModel):
+    """한 구간의 토큰 합계."""
+
+    #: **토큰을 태운 호출 수 — 거절도 포함한다.** SAFETY 로 막힌 응답에도 입력
+    #: 토큰은 실려 온다. 네트워크 실패처럼 사용량 자체가 없는 호출만 빠진다
+    calls: int = 0
+    input_tokens: int = 0
+    #: 본문 출력. **사고 토큰은 여기 포함되지 않는다**
+    output_tokens: int = 0
+    #: 사고(thinking). Gemini 는 이것을 출력과 같은 단가로 과금한다 —
+    #: 실측(`saju-llm-cost.xlsx`)에서 medium 은 사고가 과금 출력의 절반을 넘었다.
+    #: 합쳐 두면 비용이 어디서 나는지 화면에서 안 보인다
+    reasoning_tokens: int = 0
+    #: 캐시에서 읽은 입력. 입력의 부분집합이라 합계에 더하지 않는다
+    cache_read_tokens: int = 0
+    total_tokens: int = 0
+
+
+class ModelTokenUsage(BaseModel):
+    """모델 하나의 누적. 단가가 모델마다 10배 넘게 다르므로 쪼개 준다."""
+
+    model: str
+    totals: TokenTotals = Field(default_factory=TokenTotals)
+
+
+class TokenUsage(BaseModel):
+    """AI 토큰 사용량. `llm_usage_days` 의 집계다.
+
+    **예산·잔여는 없다.** Gemini API 가 잔여 할당량을 응답으로 주지 않고, 이 제품은
+    월 예산을 두지 않기로 했다(2026-09-14). 없는 숫자를 추정해 보여주는 것보다
+    쓴 만큼만 말하는 편이 정직하다.
+
+    **임베딩은 빠져 있다.** RAG 색인·검색이 쓰는 `embed_content` 는 토큰 수를 주지
+    않는다(과금 단위가 문자다). 여기 숫자는 생성 호출만이고, 화면도 그렇게 밝힌다.
+    """
+
+    today: TokenTotals = Field(default_factory=TokenTotals)
+    month: TokenTotals = Field(default_factory=TokenTotals)
+    total: TokenTotals = Field(default_factory=TokenTotals)
+    #: 누적 합계 내림차순
+    by_model: list[ModelTokenUsage] = Field(default_factory=list)
+    #: **집계를 시작한 날(KST, `YYYY-MM-DD`).** 과거는 채우지 않았으므로 화면이
+    #: 이것을 밝혀야 "누적" 이 언제부터인지 오해가 없다
+    started_on: str | None = None
+    last_used_at: str | None = None
 
 
 class OpsSnapshot(BaseModel):
@@ -126,5 +237,9 @@ class OpsSnapshot(BaseModel):
     #: 배치 실행 기록. **목록인 것은 의도다** — 지금은 스냅샷 배치 하나만 기록하지만,
     #: 시가총액·등락률 배치가 같은 기록자를 채택할 때 스키마를 바꾸지 않아도 된다.
     batches: list[BatchStatus] = Field(default_factory=list)
+
+    #: AI 토큰 사용량. 위 `advice_*` 와 **다른 질문**에 답한다 — 그쪽은 재시작하면
+    #: 0 이 되는 현재 상태고, 이쪽은 누적이라 DB 에 쌓인다
+    token_usage: TokenUsage = Field(default_factory=TokenUsage)
 
     generated_at: str

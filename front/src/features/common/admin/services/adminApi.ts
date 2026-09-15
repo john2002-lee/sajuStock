@@ -6,9 +6,15 @@ import type {
   AuditEntry,
   OpsSnapshot,
   Role,
+  TokenTotals,
+  TokenUsage,
+  VisitStats,
   WireAdminUser,
   WireAuditEntry,
   WireOpsSnapshot,
+  WireTokenTotals,
+  WireTokenUsage,
+  WireVisitStats,
 } from "../model/types";
 
 /**
@@ -32,6 +38,53 @@ function toUser(row: WireAdminUser): AdminUser {
     watchlistCount: row.watchlist_count,
     hasProfile: row.has_profile,
     activeSessions: row.active_sessions,
+  };
+}
+
+const NO_TOKENS: TokenTotals = {
+  calls: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  reasoningTokens: 0,
+  cacheReadTokens: 0,
+  totalTokens: 0,
+};
+
+/**
+ * 칸 하나하나에 `?? 0` 을 붙인다. **객체만 확인하는 것으로는 부족하다** —
+ * 필드가 하나 비면 `undefined` 가 그대로 포맷터에 들어가 화면에 "NaN 토큰" 이
+ * 찍힌다. 값이 없다는 것과 값이 깨졌다는 것은 보는 사람에게 전혀 다른 신호다.
+ */
+function toTotals(raw: WireTokenTotals | undefined): TokenTotals {
+  if (!raw) return NO_TOKENS;
+  return {
+    calls: raw.calls ?? 0,
+    inputTokens: raw.input_tokens ?? 0,
+    outputTokens: raw.output_tokens ?? 0,
+    reasoningTokens: raw.reasoning_tokens ?? 0,
+    cacheReadTokens: raw.cache_read_tokens ?? 0,
+    totalTokens: raw.total_tokens ?? 0,
+  };
+}
+
+/**
+ * 토큰 사용량. **필드가 통째로 없을 수 있다.**
+ *
+ * 프런트와 백엔드가 따로 배포되므로, 프런트가 먼저 올라가면 예전 백엔드의 응답에
+ * 이 키가 없다. 그때 `raw.today` 를 읽으면 런타임에서 죽고 관리자 화면 **전체**가
+ * 안내로 바뀐다 — 배치 목록을 `?? []` 로 받는 것과 같은 이유로 0 으로 접는다.
+ */
+function toTokenUsage(raw: WireTokenUsage | undefined): TokenUsage {
+  return {
+    today: toTotals(raw?.today),
+    month: toTotals(raw?.month),
+    total: toTotals(raw?.total),
+    byModel: (raw?.by_model ?? []).map((row) => ({
+      model: row.model,
+      totals: toTotals(row.totals),
+    })),
+    startedOn: raw?.started_on ?? null,
+    lastUsedAt: raw?.last_used_at ?? null,
   };
 }
 
@@ -66,6 +119,42 @@ export async function fetchOps(actor: AdminActor): Promise<OpsSnapshot> {
       lastFailureAt: batch.last_failure_at,
       lastFailureDetail: batch.last_failure_detail,
     })),
+    tokenUsage: toTokenUsage(raw.token_usage),
+    generatedAt: raw.generated_at,
+  };
+}
+
+export async function fetchVisits(
+  actor: AdminActor,
+  options: { limit?: number; offset?: number } = {},
+): Promise<VisitStats> {
+  const raw = await apiGet<WireVisitStats>("/admin/visits", {
+    query: { limit: options.limit ?? 50, offset: options.offset ?? 0 },
+    headers: adminHeaders(actor),
+  });
+
+  return {
+    totalVisitors: raw.total_visitors,
+    totalVisitDays: raw.total_visit_days,
+    anonVisitors: raw.anon_visitors,
+    memberVisitors: raw.member_visitors,
+    todayVisitors: raw.today_visitors,
+    today: raw.today,
+    // 서버가 빈 날까지 채워 보낸다 — 여기서 축을 다시 세우지 않는다.
+    // 세우면 두 곳이 날짜를 판단하고, 그 둘이 어긋나는 순간 그래프가 하루 밀린다.
+    daily: (raw.daily ?? []).map((point) => ({
+      day: point.day,
+      visitors: point.visitors,
+    })),
+    members: (raw.members ?? []).map((row) => ({
+      userId: row.user_id,
+      email: row.email,
+      name: row.name,
+      visitCount: row.visit_count,
+      lastSeenAt: row.last_seen_at,
+      firstSeenAt: row.first_seen_at,
+    })),
+    memberTotal: raw.member_total,
     generatedAt: raw.generated_at,
   };
 }

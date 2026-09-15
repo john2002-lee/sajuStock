@@ -7,6 +7,12 @@ import type { WireChart, WireLuck } from "../services/wire";
 import { toChart, toLuck } from "../services/wire";
 import type { SajuChart, Luck } from "../model/types";
 import { SUPPORT_EMAIL } from "@/lib/config/public";
+import { SAJU_EVENT } from "@/shared/analytics/events";
+import { identifyUser } from "@/shared/analytics/track";
+import { trackSaju } from "../model/analytics";
+import { elapsedSince, setReportTier } from "../model/analytics-context";
+import { extractPreamble, splitSections } from "../model/sections";
+import { loadViews, recordView, saveViews } from "../model/report-views";
 import { abortableSleep } from "../services/jobs";
 import { Shaman } from "./Shaman";
 import { FollowUpChat, toFollowUpInitial, type FollowUpInitial } from "./FollowUpChat";
@@ -94,6 +100,7 @@ export function PaidReportScreen({ token }: { token: string }) {
     const controller = new AbortController();
     const url = `/api/saju/reports/${encodeURIComponent(token)}`;
     const deadline = Date.now() + WAIT_DEADLINE_MS;
+    const startedAt = Date.now();
 
     async function load() {
       for (;;) {
@@ -110,6 +117,41 @@ export function PaidReportScreen({ token }: { token: string }) {
             source: data.source,
             followUp: toFollowUpInitial(data),
           });
+
+          // 결제 리다이렉트로 돌아온 브라우저는 새 페이지 수명을 갖는다 — 티저에서
+          // 넣어 둔 등급이 남아 있더라도 여기서 다시 확정해 두어야, 북마크로 곧장
+          // 들어온 재열람에도 `paid` 가 실린다.
+          setReportTier("paid");
+
+          // 첫 열람은 매출 퍼널의 최종 전환이고, 두 번째부터는 리텐션이다.
+          // 한 이벤트로 두면 재방문마다 전환이 부풀어 전환율이 100% 를 넘는다.
+          const seen = recordView(loadViews(), token);
+          saveViews(seen.map);
+
+          const shared = {
+            report_source: data.source,
+            section_count: splitSections(data.markdown).length,
+            has_preamble: extractPreamble(data.markdown).length > 0,
+          };
+
+          if (seen.viewIndex === 1) {
+            trackSaju(SAJU_EVENT.reportViewed, {
+              ...shared,
+              // 결제 직후 이 화면이 기다린 시간. 서버에서 이미 끝나 있었으면 짧다.
+              generation_ms: Date.now() - startedAt,
+              // 같은 브라우저에서 입력부터 이어졌을 때만 잴 수 있다. 결제
+              // 리다이렉트가 sessionStorage 를 지우지는 않으므로 대개 남아 있다.
+              time_to_report_ms: elapsedSince("birth_submitted") ?? null,
+            });
+            identifyUser({ preInsert: { report_tier_seen: "paid" } });
+          } else {
+            trackSaju(SAJU_EVENT.reportReopened, {
+              ...shared,
+              view_index: seen.viewIndex,
+              days_since_purchase: seen.daysSinceFirst,
+              followups_used: data.follow_ups_spent,
+            });
+          }
           return;
         } catch (err) {
           // 화면을 떠나서 끊은 것은 실패가 아니다.
@@ -124,6 +166,15 @@ export function PaidReportScreen({ token }: { token: string }) {
             continue;
           }
 
+          trackSaju(SAJU_EVENT.reportFailed, {
+            // 생성은 서버에서 끝났고 **가져오는 데** 실패한 것이다. 무료 경로의
+            // `job` 실패와 고치는 자리가 다르다.
+            failure_stage: "fetch",
+            error_code: isApi ? err.code : "network",
+            http_status: isApi ? err.status : 0,
+            // 기다리다 상한에 걸린 것인지, 처음부터 거절된 것인지.
+            elapsed_ms: Date.now() - startedAt,
+          });
           setError({
             message: isApi ? err.message : "리포트를 불러오지 못했습니다.",
             // 409 는 "아직 준비 중" 이거나 "확인 중" 이다 — 둘 다 다시 열어 볼 가치가 있다.

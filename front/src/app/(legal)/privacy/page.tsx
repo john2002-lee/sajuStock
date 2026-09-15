@@ -49,7 +49,7 @@ import { RETENTION_DAYS, SUPPORT_EMAIL } from "@/lib/config/public";
 
 export const metadata: Metadata = {
   title: "개인정보처리방침",
-  description: "종목 원장이 수집하는 개인정보 항목 · 이용 목적 · 보관 기간 · 파기 절차",
+  description: "FEEL 이 수집하는 개인정보 항목 · 이용 목적 · 보관 기간 · 파기 절차",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -71,7 +71,7 @@ export default function PrivacyPolicyPage() {
 
       <Section title="1. 수집하는 개인정보 항목">
         <p>
-          종목 원장(이하 &ldquo;서비스&rdquo;)이 수집하는 항목은 이용하시는 기능에 따라
+          FEEL(이하 &ldquo;서비스&rdquo;)이 수집하는 항목은 이용하시는 기능에 따라
           다릅니다.
         </p>
 

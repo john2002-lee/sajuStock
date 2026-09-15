@@ -1,11 +1,27 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ApiError, bff } from "@/lib/http/browser";
+import { SAJU_EVENT } from "@/shared/analytics/events";
+import { identifyUser } from "@/shared/analytics/track";
 import type { BirthPlace } from "../model/types";
-import { saveReading } from "../model/storage";
+import { loadReading, saveReading } from "../model/storage";
+import { trackSaju } from "../model/analytics";
+import {
+  markTime,
+  setChartContext,
+  secondsSince,
+  setRootPathOnce,
+  setTimeUnknown,
+} from "../model/analytics-context";
+import {
+  kstDate,
+  rootPathFromReferrer,
+  toDayMaster,
+  toDominantElement,
+} from "../model/analytics-values";
 import { fromBirthInput, toReading, type WireReading } from "../services/wire";
 import { BirthForm, type BirthFormValues } from "./BirthForm";
 
@@ -47,15 +63,78 @@ export function SajuEntry({ places }: { places: BirthPlace[] }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * 이 세션에서 몇 번째 제출인가. **컴포넌트 상태가 아니라 ref 다** — 이 값이
+   * 바뀐다고 화면이 달라질 것이 없고, `setState` 로 두면 제출할 때마다 폼 전체가
+   * 한 번 더 렌더된다.
+   */
+  const submitCount = useRef(0);
+
+  // 진입 계측. 빈 의존성 배열이라 마운트당 한 번이고, StrictMode 의 두 번째
+  // 실행에서는 `setRootPathOnce` 가 앞의 값을 지키므로 첫 진입 문이 흔들리지 않는다.
+  useEffect(() => {
+    const rootPath = rootPathFromReferrer(document.referrer, window.location.origin);
+    setRootPathOnce(rootPath);
+    markTime("entry_viewed");
+    trackSaju(SAJU_EVENT.entryViewed, { is_returning: loadReading() !== null });
+
+    // `setOnce` 라 두 번째 방문이 첫 값을 덮지 않는다. 코호트의 기준선이 흔들리면
+    // 리텐션 차트 전체가 조용히 틀려진다.
+    identifyUser({ setOnce: { first_seen_at: kstDate(), first_root_path: rootPath } });
+  }, []);
+
   async function handleSubmit(values: BirthFormValues) {
     setPending(true);
     setError(null);
+
+    const retryIndex = submitCount.current;
+    submitCount.current += 1;
+
+    // 시각 모름 여부는 **제출 이벤트보다 먼저** 컨텍스트에 넣는다. 그래야 이
+    // 이벤트부터 퍼널 끝까지 같은 값이 실린다.
+    setTimeUnknown(values.hour === null);
+    markTime("birth_submitted");
+
+    const calendarType = values.isLunar ? "lunar" : "solar";
+    trackSaju(SAJU_EVENT.birthSubmitted, {
+      calendar_type: calendarType,
+      is_leap_month: values.isLeapMonth,
+      gender: values.gender,
+      // 출생지 **코드가 아니라 골랐는지 여부**만 보낸다. 진태양시 보정의 실사용도를
+      // 재는 데는 이것으로 충분하고, 코드는 역산의 재료가 된다.
+      has_birth_place: Boolean(values.birthPlaceCode),
+      form_seconds: secondsSince("entry_viewed"),
+      retry_index: retryIndex,
+    });
+
+    const startedAt = Date.now();
     try {
       const wire = await bff.post<WireReading>("/api/saju/chart", fromBirthInput(values));
       if (!wire) throw new Error("빈 응답");
-      saveReading({ birth: values, reading: toReading(wire) });
+      const reading = toReading(wire);
+
+      // 일간·오행도 **계산 이벤트보다 먼저** 넣어야 이 이벤트에 실린다.
+      const dayMaster = toDayMaster(reading.chart.dayMaster);
+      const dominantElement = toDominantElement(reading.chart.visibleWuxing);
+      if (dayMaster && dominantElement) {
+        setChartContext({ day_master: dayMaster, dominant_element: dominantElement });
+      }
+      trackSaju(SAJU_EVENT.chartCalculated, { elapsed_ms: Date.now() - startedAt });
+      // 한 기기로 몇 사람의 사주를 보는가. 이 값이 1보다 크다는 사실이 일간·성별을
+      // 유저 프로퍼티로 두면 안 되는 이유의 근거다.
+      identifyUser({ add: { saju_chart_count: 1 } });
+
+      saveReading({ birth: values, reading });
       router.push("/saju/teaser");
     } catch (err) {
+      trackSaju(SAJU_EVENT.chartFailed, {
+        // 서버가 준 코드가 없으면 백엔드에 닿지도 못한 것이다. 그 둘은 고치는
+        // 사람이 다르므로 값으로 갈라 둔다.
+        error_code: err instanceof ApiError ? err.code : "network",
+        http_status: err instanceof ApiError ? err.status : 0,
+        elapsed_ms: Date.now() - startedAt,
+        calendar_type: calendarType,
+      });
       setError(
         err instanceof ApiError
           ? err.message

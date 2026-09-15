@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, bff } from "@/lib/http/browser";
 import { SUPPORT_EMAIL } from "@/lib/config/public";
+import { SAJU_EVENT, SAJU_PRODUCT_ID } from "@/shared/analytics/events";
+import { identifyUser, trackRevenue } from "@/shared/analytics/track";
+import { trackSaju } from "../model/analytics";
+import { kstDate } from "../model/analytics-values";
 import { Shaman } from "./Shaman";
 import { ShamanDance } from "./ShamanDance";
 
@@ -68,6 +72,8 @@ export function PaySuccessScreen() {
     started.current = true;
 
     let cancelled = false;
+    const startedAt = Date.now();
+    const paidKrw = Number(amount);
     bff
       .post<Confirmed>("/api/saju/payments/confirm", {
         payment_key: paymentKey,
@@ -77,6 +83,35 @@ export function PaySuccessScreen() {
       .then((data) => {
         if (cancelled) return;
         if (!data?.access_token) throw new Error("빈 응답");
+
+        // **매출이 확정되는 단 한 순간이다.** 토스가 성공으로 돌려보낸 것만으로는
+        // 아직 아니고(위 주석), 여기서만 돈이 확정된다.
+        //
+        // 결제 자격증명(`paymentKey`·`orderId`)은 아무것도 싣지 않는다 — 셋이
+        // 모이면 승인 요청을 만들 수 있다.
+        trackSaju(SAJU_EVENT.paymentConfirmed, {
+          price_krw: paidKrw,
+          product_id: SAJU_PRODUCT_ID,
+          confirm_elapsed_ms: Date.now() - startedAt,
+          // 결제한 순간 리포트가 이미 있었는가. 거짓이면 다음 화면이 기다린다.
+          is_report_ready: Boolean(data.ready),
+        });
+
+        // 퍼널은 위 이벤트가, 금액은 이것이 맡는다. 매출 차트는 `Revenue` 로
+        // 들어온 것만 센다.
+        trackRevenue({
+          productId: SAJU_PRODUCT_ID,
+          price: paidKrw,
+          quantity: 1,
+        });
+
+        const today = kstDate();
+        identifyUser({
+          setOnce: { first_purchased_at: today },
+          set: { last_purchased_at: today, is_payer: true },
+          add: { saju_purchase_count: 1, lifetime_revenue_krw: paidKrw },
+          preInsert: { report_tier_seen: "paid" },
+        });
         // `ready` 를 보지 않고 언제나 이동한다. 리포트가 아직 없어도 그 화면이
         // 기다려 주므로, 여기서 붙잡아 두면 같은 기다림을 두 곳에 만드는 셈이다.
         //
@@ -86,6 +121,17 @@ export function PaySuccessScreen() {
       .catch((err) => {
         if (cancelled) return;
         const isApi = err instanceof ApiError;
+        trackSaju(SAJU_EVENT.paymentFailed, {
+          // 결제창까지는 갔고 승인에서 막힌 것이다. `PayButton` 이 쏘는 `order` ·
+          // `checkout` 과 이 값으로 갈린다.
+          failure_stage: "confirm",
+          error_code: isApi ? err.code : "network",
+          http_status: isApi ? err.status : 0,
+          // 409 는 사람이 대조해야 하는 상태다. 다른 실패와 섞으면 "환불해야 할
+          // 건" 이 실패율 뒤에 숨는다.
+          is_duplicate: isApi && err.status === 409,
+          price_krw: paidKrw,
+        });
         setError({
           message: isApi
             ? err.message

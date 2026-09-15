@@ -10,6 +10,7 @@
     "test": "node --import ./test/register.mjs --test \"src/**/*.test.ts\""
   },
   "dependencies": {
+    "@amplitude/unified": "^1.1.32",
     "@auth/pg-adapter": "^1.11.3",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",

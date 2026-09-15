@@ -102,6 +102,68 @@ export function batchLabel(name: string): string {
   return BATCH_LABELS[name] ?? name;
 }
 
+/** back/app/schemas/admin.py : TokenTotals */
+export interface WireTokenTotals {
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  reasoning_tokens: number;
+  cache_read_tokens: number;
+  total_tokens: number;
+}
+
+/** back/app/schemas/admin.py : ModelTokenUsage */
+export interface WireModelTokenUsage {
+  model: string;
+  totals: WireTokenTotals;
+}
+
+/** back/app/schemas/admin.py : TokenUsage */
+export interface WireTokenUsage {
+  today: WireTokenTotals;
+  month: WireTokenTotals;
+  total: WireTokenTotals;
+  by_model: WireModelTokenUsage[];
+  started_on: string | null;
+  last_used_at: string | null;
+}
+
+export interface TokenTotals {
+  /** 성공한 호출 수. 실패는 사용량 메타가 없어 세지 않는다 */
+  calls: number;
+  inputTokens: number;
+  /** 본문 출력. **사고 토큰은 여기 포함되지 않는다** */
+  outputTokens: number;
+  /**
+   * 사고(thinking) 토큰. Gemini 는 이것을 **출력과 같은 단가로 과금한다** —
+   * 실측에서 `llm_effort=medium` 은 사고가 과금 출력의 절반을 넘었다. 출력과 합쳐
+   * 한 칸에 넣으면 비용이 어디서 나는지 화면에서 사라진다.
+   */
+  reasoningTokens: number;
+  /** 캐시에서 읽은 입력. 입력의 부분집합이라 합계에 더하지 않는다 */
+  cacheReadTokens: number;
+  totalTokens: number;
+}
+
+export interface ModelTokenUsage {
+  model: string;
+  totals: TokenTotals;
+}
+
+export interface TokenUsage {
+  today: TokenTotals;
+  month: TokenTotals;
+  total: TokenTotals;
+  /** 누적 합계 내림차순. 모델마다 단가가 달라 합계만으로는 비용을 못 읽는다 */
+  byModel: ModelTokenUsage[];
+  /**
+   * 집계를 시작한 날 (KST `YYYY-MM-DD`). **과거는 채우지 않았다** — 화면이 이것을
+   * 밝혀야 "누적" 이 언제부터의 누적인지 오해가 없다. 한 건도 없으면 null.
+   */
+  startedOn: string | null;
+  lastUsedAt: string | null;
+}
+
 /** back/app/schemas/admin.py : OpsSnapshot */
 export interface WireOpsSnapshot {
   calendar_covered: number;
@@ -117,6 +179,7 @@ export interface WireOpsSnapshot {
   advice_locked: boolean;
   rag_enabled: boolean;
   batches: WireBatchStatus[];
+  token_usage: WireTokenUsage;
   generated_at: string;
 }
 
@@ -142,6 +205,81 @@ export interface OpsSnapshot {
    * 정상인지 배치가 죽은 것인지는 이쪽만 답할 수 있다.
    */
   batches: BatchStatus[];
+  /**
+   * AI 토큰 사용량. 위 `adviceCached` 와 **다른 질문**에 답한다 — 그쪽은
+   * 재시작하면 0 이 되는 현재 상태고, 이쪽은 DB 에 쌓이는 누적이다.
+   */
+  tokenUsage: TokenUsage;
+  generatedAt: string;
+}
+
+/** back/app/schemas/admin.py : DailyVisitPoint */
+export interface WireDailyVisitPoint {
+  day: string;
+  visitors: number;
+}
+
+/** back/app/schemas/admin.py : MemberVisit */
+export interface WireMemberVisit {
+  user_id: string;
+  email: string | null;
+  name: string | null;
+  visit_count: number;
+  last_seen_at: string | null;
+  first_seen_at: string | null;
+}
+
+/** back/app/schemas/admin.py : VisitStats */
+export interface WireVisitStats {
+  total_visitors: number;
+  total_visit_days: number;
+  anon_visitors: number;
+  member_visitors: number;
+  today_visitors: number;
+  today: string;
+  daily: WireDailyVisitPoint[];
+  members: WireMemberVisit[];
+  member_total: number;
+  generated_at: string;
+}
+
+export interface DailyVisitPoint {
+  /** KST 기준 날짜 (`YYYY-MM-DD`) */
+  day: string;
+  visitors: number;
+}
+
+export interface MemberVisit {
+  userId: string;
+  email: string | null;
+  name: string | null;
+  /** 방문한 **날 수**. 접속 정의가 하루 1회라 이것이 접속수다 */
+  visitCount: number;
+  lastSeenAt: string | null;
+  firstSeenAt: string | null;
+}
+
+export interface VisitStats {
+  /**
+   * 서로 다른 방문자 수 (익명 + 회원).
+   *
+   * **회원 수가 아니다.** 사주 서비스는 회원가입을 받지 않으므로 대부분이 익명이고,
+   * 그래서 화면이 `anonVisitors`·`memberVisitors` 로 구성을 함께 밝힌다.
+   */
+  totalVisitors: number;
+  /** 방문일의 합. `totalVisitors` 보다 크면 재방문이 있었다 */
+  totalVisitDays: number;
+  anonVisitors: number;
+  memberVisitors: number;
+  /** 오늘(KST) 접속자수 */
+  todayVisitors: number;
+  /** 그 "오늘" 이 며칠인지. KST 환산이 살아 있는지가 이 값으로 드러난다 */
+  today: string;
+  /** 최신이 먼저. **방문 0 인 날도 들어 있다** — 축은 서버가 세운다 */
+  daily: DailyVisitPoint[];
+  members: MemberVisit[];
+  /** 접속 기록이 있는 회원 수. `members` 는 그중 한 페이지다 */
+  memberTotal: number;
   generatedAt: string;
 }
 

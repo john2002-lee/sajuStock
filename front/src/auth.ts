@@ -1,10 +1,14 @@
 import { cache } from "react";
 import PostgresAdapter from "@auth/pg-adapter";
-import NextAuth, { type NextAuthConfig } from "next-auth";
+import NextAuth, { AuthError, type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { findUserByEmail } from "@/lib/auth/accounts";
-import { SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session-cookie";
+import { isSeedAdmin } from "@/lib/auth/admin";
+import {
+  isExpiredSessionError,
+  SESSION_MAX_AGE_SECONDS,
+} from "@/lib/auth/session-cookie";
 import { burnPasswordTime, verifyPassword } from "@/lib/auth/password";
 import { authPool } from "@/lib/auth/pool";
 
@@ -164,6 +168,44 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
    * 회수할 방법이 없으면 남은 방어는 수명뿐이라, 예전 기본값 30일은 너무 길다.
    */
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS },
+  /**
+   * 로그를 **심각도에 맞게** 남긴다.
+
+   * 기본 로거는 `JWTSessionError` 를 ERROR 세 줄로 찍는다 — 제목, 스택,
+   * 그리고 디코드하려던 JWT 페이로드 전문(`[auth][details]`). 그런데 그 오류의
+   * 대부분은 **8시간이 지난 세션 쿠키**이고, 그건 우리가 그렇게 설계한 결과다
+   * (`lib/auth/session-cookie` 의 두 수명). 브라우저를 하루 켜 둔 사람의 매 요청마다
+   * 그 세 줄이 쌓이면, 배포 로그에서 진짜 오류를 찾을 수 없게 된다.
+   *
+   * 그래서 **그 경우만** 한 줄 info 로 낮춘다. 개인정보도 함께 빠진다 — 그 세 번째
+   * 줄에는 이름·이메일·프로필 사진 주소가 들어 있다.
+   *
+   * 나머지는 기본 로거와 같은 내용을 그대로 남긴다. ANSI 색만 뺐다 — 개발 콘솔에서는
+   * 색이 읽기 좋지만 Cloud Run·Vercel 로그에서는 `[31m` 같은 제어문자로 보인다.
+   */
+  logger: {
+    error(error) {
+      if (isExpiredSessionError(error)) {
+        // 세 줄이 아니라 한 줄이고, 페이로드를 찍지 않는다. 화면은 정상이다 —
+        // 세션을 `null` 로 보고 로그아웃 상태를 그린다.
+        console.info("[auth] 만료된 세션 쿠키를 무시했습니다 — 다시 로그인하면 됩니다");
+        return;
+      }
+
+      const name = error instanceof AuthError ? error.type : error.name;
+      console.error(`[auth][error] ${name}: ${error.message}`);
+
+      const cause = error.cause;
+      if (cause && typeof cause === "object" && "err" in cause) {
+        const { err, ...data } = cause as { err: unknown } & Record<string, unknown>;
+        if (err instanceof Error) console.error("[auth][cause]:", err.stack);
+        console.error("[auth][details]:", JSON.stringify(data, null, 2));
+      } else if (error.stack) {
+        console.error(error.stack);
+      }
+    },
+  },
+
   pages: {
     signIn: "/login",
     /**
@@ -187,6 +229,51 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     error: "/login",
   },
   callbacks: {
+    /**
+     * 로그인 문턱 — **관리자가 아니면 들이지 않는다.**
+     *
+     * ## 왜 문턱이 필요한가
+     *
+     * 공개 회원가입은 닫혀 있고(`lib/auth/signup`), 비밀번호 계정은 관리자가 발급한다.
+     * 그러니 로그인하는 사람은 운영자뿐이어야 하는데 **구글 버튼은 아무나 누를 수
+     * 있다.** 막지 않으면 지나가던 사람의 구글 계정이 `role = 'user'` 로 생기고,
+     * 그 사람은 회원도 아닌데 계정만 갖게 된다. 정리할 대상이 조용히 쌓인다.
+     *
+     * ## 거절이 **계정 생성보다 먼저** 온다
+     *
+     * Auth.js 의 콜백 경로는 `handleAuthorized`(이 콜백) → `handleLoginOrRegister`
+     * (어댑터가 `users`·`accounts` 를 만드는 자리) 순서다
+     * (`@auth/core/lib/actions/callback/index.js`). 여기서 `false` 를 내면 행이
+     * 아예 만들어지지 않는다 — 만들고 지우는 것보다 안 만드는 편이 낫다.
+     *
+     * ## 화면에는 "회원이 아닙니다" 로 도착한다
+     *
+     * `false` 는 `AccessDenied` 가 되고, 그 타입은 클라이언트에 그대로 전달되는
+     * 목록에 있어 `/login?error=AccessDenied` 로 돌아온다(`pages.error`). 문구는
+     * 로그인 화면의 `ERROR_MESSAGES` 가 갖는다.
+     *
+     * ## 판단은 이메일로 한다
+     *
+     * 구글로 처음 들어오는 사람에게는 아직 DB 행이 없어 `user.role` 을 믿을 수 없다.
+     * 씨앗 관리자(`ADMIN_EMAILS`)를 먼저 보고, 그다음 `users.role` 을 읽는다 —
+     * 관리자 판단의 두 갈래가 `lib/auth/admin` 과 같은 순서다.
+     *
+     * 이메일이 없으면 거절한다. 판단할 근거가 없는데 들이는 쪽으로 기울 이유가 없다.
+     */
+    async signIn({ user }) {
+      const email = user.email ?? null;
+      if (!email) return false;
+
+      if (isSeedAdmin(email)) return true;
+
+      // DB 가 없으면 `users.role` 을 물을 곳이 없다. 그 구성에서 인정되는 관리자는
+      // 씨앗뿐이고, 위에서 이미 봤다.
+      if (!hasDatabase) return false;
+
+      const known = await findUserByEmail(email);
+      return known?.role === "admin";
+    },
+
     /**
      * 토큰에 사용자 ID 와 권한을 싣는다. **권한은 매 요청 DB 에서 다시 읽는다.**
      *

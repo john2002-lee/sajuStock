@@ -22,19 +22,33 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from app.api.auth import require_admin_key
-from app.api.deps import BatchRunRepo, DbSession, ListedCompanyRepo
+from app.api.deps import (
+    BatchRunRepo,
+    DbSession,
+    ListedCompanyRepo,
+    LlmUsageRepo,
+    VisitRepo,
+)
 from app.repositories.admin import AdminRepository, AdminUserRow
+from app.repositories.llm_usage import LlmUsageSummary
+from app.repositories.llm_usage import TokenTotals as RepoTotals
 from app.schemas.admin import (
     AdminUser,
     AdminUserPage,
     AuditEntry,
     AuditPage,
     BatchStatus,
+    DailyVisitPoint,
     DeleteResult,
+    MemberVisit,
+    ModelTokenUsage,
     OpsSnapshot,
     RoleUpdate,
+    TokenTotals,
+    TokenUsage,
+    VisitStats,
 )
-from app.services import admin_service
+from app.services import admin_service, visit_service
 from app.services.admin_service import Actor, AdminError, UsersUnavailable
 
 router = APIRouter(
@@ -110,8 +124,43 @@ def _translate(error: AdminError) -> HTTPException:
     return HTTPException(status.HTTP_409_CONFLICT, str(error))
 
 
+def _token_usage(summary: LlmUsageSummary) -> TokenUsage:
+    """서비스 dataclass → 응답 스키마.
+
+    날짜를 문자열로 바꾸는 것이 이 함수의 절반이다. 프런트는 KST 문자열을 그대로
+    그리고, 그 환산은 **저장 시점에 이미 끝났다** (`llm_usage_days.usage_date`).
+    여기서 다시 시간대를 만지면 같은 판단이 두 곳에 생긴다.
+    """
+
+    def totals(value: RepoTotals) -> TokenTotals:
+        return TokenTotals(
+            calls=value.calls,
+            input_tokens=value.input_tokens,
+            output_tokens=value.output_tokens,
+            reasoning_tokens=value.reasoning_tokens,
+            cache_read_tokens=value.cache_read_tokens,
+            total_tokens=value.total_tokens,
+        )
+
+    return TokenUsage(
+        today=totals(summary.today),
+        month=totals(summary.month),
+        total=totals(summary.total),
+        by_model=[
+            ModelTokenUsage(model=row.model, totals=totals(row.totals))
+            for row in summary.by_model
+        ],
+        started_on=summary.started_on.isoformat() if summary.started_on else None,
+        last_used_at=(
+            summary.last_used_at.isoformat() if summary.last_used_at else None
+        ),
+    )
+
+
 @router.get("/ops", response_model=OpsSnapshot, summary="운영 현황")
-async def get_ops(listings: ListedCompanyRepo, runs: BatchRunRepo) -> OpsSnapshot:
+async def get_ops(
+    listings: ListedCompanyRepo, runs: BatchRunRepo, usage: LlmUsageRepo
+) -> OpsSnapshot:
     """배치 진행률 · **배치 실행 기록** · AI 캐시 · 자물쇠 상태.
 
     **배치를 돌리지 않는다.** 다른 화면(`/markets/calendar`·`/markets/screener`)은
@@ -122,7 +171,7 @@ async def get_ops(listings: ListedCompanyRepo, runs: BatchRunRepo) -> OpsSnapsho
     얼마나 채웠나", 뒤는 "그 채우는 일이 **돌고 있나**" 다. 커버리지가 며칠째 같은
     숫자일 때 그것이 정상인지 배치가 죽은 것인지는 뒤쪽만 답할 수 있다.
     """
-    snapshot = await admin_service.get_ops_snapshot(listings, runs)
+    snapshot = await admin_service.get_ops_snapshot(listings, runs, usage)
     return OpsSnapshot(
         calendar_covered=snapshot.calendar_covered,
         fundamentals_covered=snapshot.fundamentals_covered,
@@ -136,6 +185,7 @@ async def get_ops(listings: ListedCompanyRepo, runs: BatchRunRepo) -> OpsSnapsho
         advice_max_concurrent=snapshot.advice_max_concurrent,
         advice_locked=snapshot.advice_locked,
         rag_enabled=snapshot.rag_enabled,
+        token_usage=_token_usage(snapshot.token_usage),
         batches=[
             BatchStatus(
                 name=batch.name,
@@ -150,6 +200,59 @@ async def get_ops(listings: ListedCompanyRepo, runs: BatchRunRepo) -> OpsSnapsho
             )
             for batch in snapshot.batches
         ],
+        generated_at=snapshot.generated_at,
+    )
+
+
+@router.get("/visits", response_model=VisitStats, summary="접속 통계")
+async def get_visits(
+    repo: VisitRepo,
+    limit: Annotated[int, Query(ge=1, le=200, description="회원 표 한 페이지")] = 50,
+    offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+) -> VisitStats:
+    """총·일일 접속자수 · 30일 추이 · 회원별 접속수와 최근 접속일시.
+
+    ## `active_sessions` 와 다른 질문에 답한다
+
+    회원 목록의 `active_sessions` 는 NextAuth 의 **만료되지 않은 세션 수**라
+    "지금 로그인해 있나" 에 가깝다. 여기 숫자는 누적과 추이다 — 어제 500명이
+    왔는지, 그 회원이 마지막으로 언제 왔는지는 그쪽으로 알 수 없다.
+
+    ## 익명이 대부분이라는 사실을 숫자가 밝힌다
+
+    사주 서비스는 회원가입을 받지 않으므로 방문자 다수가 익명이다. 그래서
+    `total_visitors` 만 주지 않고 `anon_visitors`·`member_visitors` 로 나눠 준다 —
+    구성을 모르면 총접속자수가 회원 수로 오해된다.
+
+    **관측이 대상을 바꾸지 않는다.** `get_ops` 와 같은 자세로, 이 조회는 아무것도
+    기록하지 않는다. 기록은 `POST /visits/touch` 가 방문자 요청으로 한다.
+    """
+    snapshot = await visit_service.get_visit_snapshot(
+        repo, member_limit=limit, member_offset=offset
+    )
+
+    return VisitStats(
+        total_visitors=snapshot.total_visitors,
+        total_visit_days=snapshot.total_visit_days,
+        anon_visitors=snapshot.anon_visitors,
+        member_visitors=snapshot.member_visitors,
+        today_visitors=snapshot.today_visitors,
+        today=snapshot.today,
+        daily=[DailyVisitPoint(day=day, visitors=n) for day, n in snapshot.daily],
+        members=[
+            MemberVisit(
+                user_id=row.user_id,
+                email=row.email,
+                name=row.name,
+                visit_count=row.visit_count,
+                last_seen_at=row.last_seen_at.isoformat() if row.last_seen_at else None,
+                first_seen_at=(
+                    row.first_seen_at.isoformat() if row.first_seen_at else None
+                ),
+            )
+            for row in snapshot.members
+        ],
+        member_total=snapshot.member_total,
         generated_at=snapshot.generated_at,
     )
 

@@ -26,6 +26,7 @@
 
 import logging
 import time
+from collections.abc import Awaitable, Callable
 
 from google import genai
 from google.genai import types
@@ -34,6 +35,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exceptions import LLMRefusedError
+from app.domain.llm_usage import LlmTokens
 from app.integrations import amplitude
 
 logger = logging.getLogger(__name__)
@@ -175,6 +177,57 @@ def _usage(response: types.GenerateContentResponse | None) -> dict:
     }
 
 
+#: 사용량을 받아 가는 쪽. 인자는 (모델, 토큰) 이다.
+UsageSink = Callable[[str, LlmTokens], Awaitable[None]]
+
+_usage_sink: UsageSink | None = None
+
+
+def set_usage_sink(sink: UsageSink | None) -> None:
+    """토큰 사용량을 저장할 곳을 꽂는다. **의존을 뒤집기 위한 것이다.**
+
+    사용량은 DB 에 남아야 하는데 이 파일은 `repositories` 를 import 할 수 없다 —
+    `integrations` 는 `core` 와 `domain` 만 본다(`back/README.md` 계층 구조). 여기서
+    저장소를 직접 부르면 의존이 위로 흘러, 프로바이더 어댑터가 우리 스키마를 알게 된다.
+
+    그래서 조립은 합성 루트(`app/main.py` 의 lifespan)가 하고, 이 파일은 "누군가
+    받아 간다" 만 안다. 넘어가는 값도 우리 도메인 타입(`LlmTokens`)이라 Gemini 어휘가
+    밖으로 새지 않는다 — 이 파일의 원칙 그대로다.
+
+    **꽂히지 않았으면 아무것도 하지 않는다.** 테스트·워밍업·스크립트가 이 파일을
+    부르는 경로가 있고, 그때 DB 를 요구할 이유가 없다 (`amplitude.active_session` 이
+    없을 때와 같은 자세).
+    """
+    global _usage_sink
+    _usage_sink = sink
+
+
+async def _persist(response: types.GenerateContentResponse | None) -> None:
+    """호출 한 건의 토큰을 싱크로 넘긴다. **절대 던지지 않는다.**
+
+    거절된 응답에서도 부른다. SAFETY 로 막혀도 입력 토큰은 이미 태웠고, 그 구간이
+    집계에서 빠지면 "토큰만 쓰고 결과가 없던" 시간이 화면에서 사라진다 (`_record` 가
+    실패를 남기는 것과 같은 이유).
+
+    계측이 판단을 죽이면 안 된다 — DB 가 잠깐 안 되는 것과 AI 판단이 실패하는 것은
+    전혀 다른 사건이고, 전자 때문에 후자가 생기면 안 된다.
+    """
+    sink = _usage_sink
+    if sink is None or response is None:
+        return
+
+    # 사용량을 **읽는 일까지** try 안이다. `_usage` 는 지금 안전하지만, SDK 가
+    # 필드 타입을 바꾸면 덧셈 한 줄이 `TypeError` 가 되고 그것이 밖으로 나가면
+    # 계측 때문에 사주 리포트가 실패한다 — 이 함수가 막으려는 바로 그 일이다.
+    try:
+        tokens = LlmTokens.from_usage(_usage(response))
+        if tokens.empty:
+            return
+        await sink(settings.gemini_model, tokens)
+    except Exception:
+        logger.warning("토큰 사용량 기록에 실패했습니다", exc_info=True)
+
+
 def _record(
     *,
     content: str,
@@ -282,6 +335,7 @@ async def ask_text(system_prompt: str, user_content: str) -> str:
             response=response,
             error=exc,
         )
+        await _persist(response)
         raise
 
     text = (response.text or "").strip()
@@ -291,6 +345,7 @@ async def ask_text(system_prompt: str, user_content: str) -> str:
         system_prompt=system_prompt,
         response=response,
     )
+    await _persist(response)
     return text
 
 
@@ -387,6 +442,7 @@ async def ask_structured[ModelT: BaseModel](
             response=response,
             error=exc,
         )
+        await _persist(response)
         raise
 
     # 본문은 모델이 실제로 낸 JSON 문자열이다. `parsed` 를 다시 직렬화하면 스키마
@@ -397,6 +453,7 @@ async def ask_structured[ModelT: BaseModel](
         system_prompt=system_prompt,
         response=response,
     )
+    await _persist(response)
     return parsed
 
 
@@ -407,5 +464,6 @@ __all__ = [
     "close_client",
     "embed_texts",
     "get_client",
+    "set_usage_sink",
     "supports_thinking",
 ]

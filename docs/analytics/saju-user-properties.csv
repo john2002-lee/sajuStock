@@ -1,0 +1,20 @@
+No,User Property,Description,Data Type,Value Type,Value Example,Set Timing,Analysis,Note
+1,first_seen_at,사주 서비스 최초 접속일 (KST).,String,setOnce,2026-09-14,saju_entry_viewed,코호트 리텐션,UTC 로 찍으면 한국의 하루가 두 날에 걸쳐 쌓인다
+2,first_root_path,이 기기가 처음 들어온 문.,String,setOnce,intro,saju_entry_viewed,진입 문별 LTV,setOnce 라 두 번째 방문이 덮지 않는다
+3,saju_chart_count,사주를 계산한 누적 횟수.,Number,add,3,saju_chart_calculated,한 기기로 몇 사람을 보는가,이 값이 1보다 크다는 사실이 일간·성별을 유저 프로퍼티로 못 쓰는 근거다
+4,saju_purchase_count,유료 리포트 구매 누적 횟수.,Number,add,1,saju_payment_confirmed,재구매율,
+5,lifetime_revenue_krw,누적 결제 금액(원).,Number,add,2000,saju_payment_confirmed,LTV · ROAS,Amplitude Revenue 집계와 교차 검증용
+6,first_purchased_at,최초 결제일 (KST).,String,setOnce,2026-09-14,saju_payment_confirmed,첫 방문에서 결제까지의 리드타임,
+7,last_purchased_at,최근 결제일 (KST).,String,set,2026-09-20,saju_payment_confirmed,휴면 판정,
+8,is_payer,한 번이라도 결제했는가.,Boolean,set,true,saju_payment_confirmed,결제자/비결제자 세그먼트,한번 true 가 되면 내리지 않는다
+9,report_tier_seen,경험한 리포트 등급의 집합.,Array,preInsert,free,리포트 열람 시,무료 경험자의 유료 전환,preInsert 라 중복이 쌓이지 않는다
+10,followup_total_count,추가질문에 답을 받은 누적 횟수.,Number,add,3,saju_followup_answered,심화 사용 강도,
+X1,gender,쓰지 않는다.,—,—,—,—,—,한 기기로 배우자·자녀·친구 사주를 대신 보는 행태가 지배적이다. 마지막 조회로 덮어쓰면 여성 유저 결제율 같은 지표가 조용히 거짓이 된다. 이벤트 프로퍼티로만 쓴다
+X2,day_master,쓰지 않는다.,—,—,—,—,—,위와 같은 이유. 조회 건별 값이다
+X3,dominant_element,쓰지 않는다.,—,—,—,—,—,위와 같은 이유
+X4,calendar_type,쓰지 않는다.,—,—,—,—,—,"건별 값이다. 최빈값으로 요약한 유저 속성도 두지 않는다 — 그 이력을 보관하지 않기 때문이고, 없는 데이터를 지어내지 않는다"
+X5,is_time_unknown,쓰지 않는다.,—,—,—,—,—,건별 값이다
+X6,birth_year / birth_month / birth_day / birth_hour / birth_minute,전송 자체가 금지다.,—,—,—,—,—,네 기둥·대운 조합은 생년월일시로 역산된다. back/app/integrations/amplitude.py 의 metadata_only 결정과 같은 선. redact.ts 가 하드 블록으로 막는다
+X7,birth_place_code / birth_place_label,전송 자체가 금지다.,—,—,—,—,—,위와 동일. has_birth_place 불리언만 쓴다
+X8,access_token / order_id / payment_key,전송 자체가 금지다.,—,—,—,—,—,주소가 곧 자격증명이다. redact.ts 가 URL 과 속성 이름 양쪽에서 막는다
+X9,리포트 본문 / 추가질문 원문,전송 자체가 금지다.,—,—,—,—,—,길이(section_count · text_length)만 보낸다

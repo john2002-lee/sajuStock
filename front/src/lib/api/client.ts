@@ -124,10 +124,16 @@ export async function apiGetCached<T>(
   // 여기서 미리 삼켜 두되, 아래 await 는 원본 프라미스를 그대로 본다.
   request.catch(() => {});
 
+  // 타이머를 unref 하지 않는다. 상류가 무응답이면 이 타이머가 레이스를 끝낼 수
+  // 있는 **유일한 일감**이다. unref 하면 이벤트 루프에 다른 일이 없을 때
+  // 타임아웃이 영영 불리지 않고, 기다리던 쪽은 degrade 화면으로도 못 가고
+  // 조용히 사라진다.
+  //
+  // unref 가 막으려던 것 — 응답이 제시간에 왔는데도 남은 타이머가 프로세스를
+  // 붙잡는 것 — 은 아래 finally 의 clearTimeout 이 제대로 처리한다.
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<typeof TIMED_OUT>((resolve) => {
-    const timer = setTimeout(() => resolve(TIMED_OUT), timeoutMs);
-    // 서버 렌더가 타이머 때문에 붙잡히지 않게 한다 (Node 전용, 없으면 무시).
-    timer.unref?.();
+    timer = setTimeout(() => resolve(TIMED_OUT), timeoutMs);
   });
 
   let result: T | typeof TIMED_OUT;
@@ -140,6 +146,8 @@ export async function apiGetCached<T>(
       throw toTransportError(error.message);
     }
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
 
   if (result === TIMED_OUT) return { ok: false, reason: "timeout" };

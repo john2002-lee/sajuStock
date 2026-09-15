@@ -53,6 +53,17 @@ const SEED_ADMINS = new Set(
 export const ADMIN_CONFIGURED =
   SEED_ADMINS.size > 0 || Boolean(process.env.ADMIN_API_KEY);
 
+/**
+ * 이 이메일이 씨앗 관리자인가. **세션 이전 단계**가 쓰는 입구다.
+ *
+ * `adminActorOf` 는 세션을 받지만, 로그인 문턱(`auth.ts` 의 `signIn` 콜백)에는 아직
+ * 세션이 없다 — 구글은 프로필만 들고 돌아오고 DB 행은 그 뒤에 생긴다. 그래서 이메일
+ * 하나로 물을 수 있는 갈래를 따로 낸다. 판단 기준(`SEED_ADMINS`)은 하나뿐이다.
+ */
+export function isSeedAdmin(email: string | null | undefined): boolean {
+  return Boolean(email && SEED_ADMINS.has(email.toLowerCase()));
+}
+
 export interface AdminActor {
   userId: string;
   email: string | null;
@@ -71,7 +82,7 @@ export function adminActorOf(session: Session | null): AdminActor | null {
   if (!user?.id) return null;
 
   const email = user.email ?? null;
-  const seeded = Boolean(email && SEED_ADMINS.has(email.toLowerCase()));
+  const seeded = isSeedAdmin(email);
   if (!seeded && user.role !== "admin") return null;
 
   return { userId: user.id, email, viaSeed: seeded };

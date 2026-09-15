@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAMES } from "@/lib/auth/session-cookie";
+import { legacyRedirect } from "@/lib/routing/legacy-paths";
 import { createOwnerKey, isOwnerKey, OWNER_COOKIE } from "@/lib/watchlist/anon-cookie";
 
 /**
@@ -113,12 +114,38 @@ function redirectMovedWatchlist(request: NextRequest): NextResponse | null {
   return NextResponse.redirect(new URL(moved + request.nextUrl.search, request.nextUrl));
 }
 
+/**
+ * 제품 구조가 바뀌며 옮겨 간 주소를 새 자리로 보낸다 — 지금은 `/saju` → `/` 하나다.
+ *
+ * ## 왜 판정이 여기 없나
+ *
+ * 어느 주소가 어디로 갔는지는 `lib/routing/legacy-paths` 가 안다. 이 파일은
+ * `NextRequest` 를 끌고 오므로 테스트에서 직접 부를 수 없고, **틀리면 가장 비싼
+ * 실수**(`/saju/reports/{token}` 을 함께 튕겨 구매자가 리포트를 잃는 것)가 바로
+ * 그 판정에서 난다. 값으로 확인할 수 있는 자리에 두었다.
+ *
+ * 위 `redirectMovedWatchlist` 와 같은 이유로 페이지의 `redirect()` 가 아니다 —
+ * 그쪽은 meta refresh 로 내려가 빈 화면이 1초 스친다. **랜딩에서는 특히 안 된다.**
+ *
+ * 308 이 아니라 307 인 것도 같은 판단이다. 영구 리다이렉트는 브라우저가 캐시해
+ * 되돌리기 어렵다.
+ */
+function redirectMovedPaths(request: NextRequest): NextResponse | null {
+  const moved = legacyRedirect(request.nextUrl.pathname);
+  if (moved === null) return null;
+
+  return NextResponse.redirect(new URL(moved + request.nextUrl.search, request.nextUrl));
+}
+
 export function proxy(request: NextRequest) {
   const blocked = blockAnonymousAdmin(request);
   if (blocked) return blocked;
 
   const moved = redirectMovedWatchlist(request);
   if (moved) return moved;
+
+  const relocated = redirectMovedPaths(request);
+  if (relocated) return relocated;
 
   const toLogin = redirectAnonymousDashboard(request);
   if (toLogin) return toLogin;

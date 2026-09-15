@@ -333,8 +333,8 @@ async def _ask_report_llm(system: str, user: str) -> str:
     # 않는다.
     #
     # **본문은 나가지 않는다.** `SAJU_REPORT` 는 metadata_only 인스턴스에서 났다
-    # (`integrations/amplitude` 의 "두 도메인" 절) — 생년월일시가 프롬프트에 실려
-    # 있고 그것은 민감정보다.
+    # (`integrations/amplitude` 의 "두 도메인" 절) — 프롬프트에 생년월일시 원본은
+    # 없지만 사주 원국과 대운이 실리고, 그 둘이면 생년월일시가 역산된다.
     #
     # 열려 있는 세션을 재사용하지 **않는다.** 한때 그렇게 두었는데, 이 앱에서
     # 사주 세션을 바깥에서 여는 경로가 없어 죽은 분기였고, 더 나쁘게는 언젠가
@@ -345,6 +345,10 @@ async def _ask_report_llm(system: str, user: str) -> str:
         amplitude.SAJU_REPORT,
         # 무료 경로는 신원을 만들지 않는다 — 이 서비스가 아무것도 저장하지 않는
         # 이유와 같다(`models/saju_order.py`). 없는 신원을 지어내지 않는다.
+        #
+        # `integrations/amplitude` 가 이 자리에 **일회용 device_id** 를 대신 넣는다.
+        # 신원이 아니라 Amplitude SDK 가 이벤트를 버리지 않게 하는 최소값이다 —
+        # 그 처리가 없던 동안 사주 LLM 계측이 한 건도 도착하지 않았다.
         user_id=None,
         session_id=f"saju:{uuid4()}",
     ):

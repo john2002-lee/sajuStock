@@ -7,7 +7,7 @@ import Link from "next/link";
 
 export interface AdminShellProps {
   actor: AdminActor;
-  current: "ops" | "users";
+  current: "ops" | "visits" | "users";
   children: React.ReactNode;
 }
 
@@ -20,6 +20,11 @@ export interface AdminShellProps {
  * 페이지가 같은 호출을 또 해야 한다. 그런데 **가드는 어차피 페이지마다 있어야 한다** —
  * 레이아웃 가드는 서버 액션·라우트 핸들러를 보호하지 못하므로 "여기 있으니 됐다" 는
  * 오해를 만든다. 그래서 가드는 페이지가 부르고, 껍데기는 그 결과를 받아 그린다.
+ *
+ * ## 주식 서비스로 나가는 문이 여기 있다
+ *
+ * 사주가 메인이 되면서 공개 화면에서 주식 링크를 전부 걷어냈다. 그 결과 주식
+ * 서비스로 들어가는 **유일한 안내**가 이 화면의 탭 줄 우측이다.
  *
  * ## 신원을 화면에 띄운다
  *
@@ -58,7 +63,32 @@ export function AdminShell({ actor, current, children }: AdminShellProps) {
 
         <nav aria-label="관리자 화면" className="flex items-end gap-5 border-b border-line-20">
           <Tab href="/admin" label="운영 현황" active={current === "ops"} />
+          {/* 접속 통계가 회원 관리 앞에 온다. 회원별 접속도 여기 있지만 그쪽은
+              계정을 **바꾸는** 화면이고(권한·삭제) 이쪽은 관측이다 — 운영 현황과
+              같은 성격이라 붙여 둔다. */}
+          <Tab href="/admin/visits" label="접속 통계" active={current === "visits"} />
           <Tab href="/admin/users" label="회원 관리" active={current === "users"} />
+
+          {/* 주식 서비스 입구 — **탭이 아니다.** 위 셋은 이 화면 안에서 오가는
+              칸이고 이것은 제품 밖으로 나가는 문이라, 같은 `Tab` 으로 두면
+              `aria-current` 가 "지금 이 탭에 있다" 를 거짓으로 말하게 된다.
+              그래서 모양도 밑줄이 아니라 테두리 버튼이고, `ml-auto` 로 떨어뜨린다.
+
+              ## 왜 여기가 주식으로 들어가는 유일한 문인가
+
+              사주가 제품의 메인이 되면서 공개 표면(루트·푸터·404)에서 주식 링크를
+              전부 걷어냈다. **차단한 것은 아니다** — `/stock` 주소를 직접 치면
+              누구나 열린다. 개발 중에 되돌리기 쉬운 쪽을 골랐고, 지금 이 링크는
+              "운영자가 자기 개발 화면으로 가는 길" 이다. */}
+          <Link
+            href="/stock"
+            className="-mb-px ml-auto flex min-h-[var(--tap)] items-center gap-1.5 self-center border border-line-28 px-2.5 py-1.5 font-medium text-muted-60 hover:border-ink hover:text-ink md:min-h-0"
+            style={{ fontSize: 12.5 }}
+          >
+            <Icon name="chart" size={14} className="flex-none text-muted-45" />
+            주식 서비스
+            <span aria-hidden>→</span>
+          </Link>
         </nav>
 
         {children}

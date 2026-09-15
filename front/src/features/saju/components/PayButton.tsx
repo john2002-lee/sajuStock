@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ANONYMOUS, loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import { ApiError, bff } from "@/lib/http/browser";
+import { SAJU_EVENT, SAJU_PRODUCT_ID } from "@/shared/analytics/events";
 import type { BirthInput } from "../model/types";
+import { trackSaju } from "../model/analytics";
+import { secondsSince } from "../model/analytics-context";
 import { fromBirthInput } from "../services/wire";
 import { PillToggle } from "./PillToggle";
 
@@ -48,16 +51,38 @@ interface OrderCreated {
   amount: number;
 }
 
-export function PayButton({ birth, amount, orderName = "천명 정밀 사주 리포트" }: PayButtonProps) {
+export function PayButton({ birth, amount, orderName = "FEEL 정밀 사주 리포트" }: PayButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 카드가 먼저다 — 대부분이 그것을 먼저 집는다. 계좌이체는 카드사 인증이
   // 끝나지 않을 때의 출구다.
   const [method, setMethod] = useState<PaymentMethod>("CARD");
+  /** 이 주문의 몇 번째 시도인가. 재시도 버튼이 실제로 쓰이는지 본다. */
+  const attempts = useRef(0);
 
   async function handleClick() {
     setError(null);
     setLoading(true);
+
+    const retryIndex = attempts.current;
+    attempts.current += 1;
+
+    // 토스가 아는 식별자는 대문자지만, 이벤트 값은 소문자 snake_case 로 고정한다
+    // (`docs/analytics/saju-amplitude-taxonomy.md` 8절).
+    const paymentMethod = method === "CARD" ? "card" : "transfer";
+
+    trackSaju(SAJU_EVENT.purchaseClicked, {
+      price_krw: amount,
+      payment_method: paymentMethod,
+      product_id: SAJU_PRODUCT_ID,
+      teaser_seconds: secondsSince("teaser_viewed"),
+      retry_index: retryIndex,
+    });
+
+    // 실패 이벤트가 **어느 칸에서** 났는지 말할 수 있어야 한다. 주문 생성 실패와
+    // 결제창을 못 연 것은 고치는 사람도 고치는 방법도 다르다.
+    let stage: "order" | "checkout" = "order";
+    const startedAt = Date.now();
     try {
       if (!CLIENT_KEY || !APP_ORIGIN) {
         throw new Error("결제 설정이 없습니다.");
@@ -68,10 +93,21 @@ export function PayButton({ birth, amount, orderName = "천명 정밀 사주 리
         birth: fromBirthInput(birth),
       });
       if (!order) throw new Error("주문을 만들지 못했습니다.");
+      stage = "checkout";
 
       // 2) 토스 결제창으로 넘긴다. 금액은 **서버가 준 값**을 쓴다.
       const tossPayments = await loadTossPayments(CLIENT_KEY);
       const payment = tossPayments.payment({ customerKey: ANONYMOUS });
+
+      // 바로 아래 `requestPayment` 가 브라우저를 토스로 **넘겨 버린다.** 그 전에
+      // 쏴야 이 이벤트가 나갈 기회를 얻는다. 주문번호는 싣지 않는다 — 결제
+      // 자격증명의 한 조각이다.
+      trackSaju(SAJU_EVENT.checkoutOpened, {
+        price_krw: order.amount,
+        payment_method: paymentMethod,
+        product_id: SAJU_PRODUCT_ID,
+        order_created_ms: Date.now() - startedAt,
+      });
 
       const request = {
         amount: { currency: "KRW", value: order.amount } as const,
@@ -91,6 +127,15 @@ export function PayButton({ birth, amount, orderName = "천명 정밀 사주 리
         await payment.requestPayment({ method: "TRANSFER", ...request });
       }
     } catch (err) {
+      trackSaju(SAJU_EVENT.paymentFailed, {
+        failure_stage: stage,
+        error_code: err instanceof ApiError ? err.code : "checkout_error",
+        http_status: err instanceof ApiError ? err.status : 0,
+        is_duplicate: err instanceof ApiError && err.status === 409,
+        payment_method: paymentMethod,
+        price_krw: amount,
+        retry_index: retryIndex,
+      });
       setError(
         err instanceof ApiError
           ? err.message

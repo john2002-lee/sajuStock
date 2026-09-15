@@ -1,0 +1,82 @@
+No,Label,Event Name,Trigger,Required,Importance,Event Property,Description,Data Type,Value Example,Analysis,Note
+0.1,_context,(상속 컨텍스트),trackSaju() 래퍼가 모든 사주 이벤트에 자동 병합한다. 개별 이벤트 행에는 다시 적지 않는다.,Y,Critical,root_path,제품 안에서 어느 문으로 들어왔는가. 세션 최초 1회만 확정한다.,String,root | intro | unknown,진입 문별 결제 전환율,마케팅 채널이 아니다 — utm·referrer 는 오토캡처 attribution 이 채운다
+0.2,_context,(상속 컨텍스트),,Y,Critical,report_tier,무료/유료 모드. 티저에서 payment.enabled 로 확정하고 유료 리포트 화면에서 다시 확정한다.,String,free | paid,두 모드의 행동 차이,서버 /saju/payment/config 가 원천
+0.3,_context,(상속 컨텍스트),,Y,High,day_master,일간(日干) 한 글자. 사주 계산 성공 이후 병합하고 새 계산이 덮는다.,String,jia | yi | bing | ding | wu | ji | geng | xin | ren | gui,퍼널 Holding Constant — 일간별 결제 전환율,한자·한글 금지. 10분의 1로만 좁혀 역산 불가
+0.4,_context,(상속 컨텍스트),,Y,Medium,dominant_element,드러난 글자의 오행 최다 원소. 동점은 목화토금수 순서로 끊는다.,String,wood | fire | earth | metal | water,오행 편중과 추가질문 사용률의 상관,결정적이어야 한다 — 객체 키 순서에 맡기지 않는다
+0.5,_context,(상속 컨텍스트),,Y,High,is_time_unknown,태어난 시각을 모른다고 체크했는가. 입력 제출 이후 병합.,Boolean,false,시간 모름 여부별 이탈률,시간을 모르면 시주가 없어 리포트가 얕아진다
+1.1,saju_purchase,saju_entry_viewed,루트(/) 생년월일 입력 화면의 첫 렌더. 마운트당 1회.,Y,Medium,is_returning,이 브라우저에 이전 계산 결과가 남아 있는가.,Boolean,false,신규와 재방문의 전환율 분리,sessionStorage 의 저장된 reading 존재 여부
+2.1,saju_purchase,saju_birth_submitted,입력 폼 submit. 유효성 통과 후 계산 API 호출 직전.,Y,High,calendar_type,양력/음력 선택.,String,solar | lunar,음력 입력자의 이탈률,한글 라벨을 값으로 쓰지 않는다
+2.2,saju_purchase,saju_birth_submitted,,Y,Low,is_leap_month,윤달 체크 여부.,Boolean,false,윤달 입력 빈도 — UI 노출 축소 판단,
+2.3,saju_purchase,saju_birth_submitted,,Y,Medium,gender,성별 선택.,String,M | F,성별 세그먼트 결제율,이벤트 프로퍼티다. 대리 조회 때문에 유저 프로퍼티로 올리면 안 된다
+2.4,saju_purchase,saju_birth_submitted,,Y,Medium,has_birth_place,출생지를 골랐는가.,Boolean,true,진태양시 보정 기능의 실사용도,출생지 코드·라벨 자체는 전송 금지
+2.5,saju_purchase,saju_birth_submitted,,Y,Medium,form_seconds,입력 화면 진입부터 제출까지 초.,Number,42,입력 마찰 — 긴 체류는 폼이 어렵다는 신호,사람이 보낸 시간이라 초 단위다
+2.6,saju_purchase,saju_birth_submitted,,Y,Low,retry_index,이 화면에서 몇 번째 제출인가. 최초는 0.,Number,0,재입력 빈도 — 검증 오류 체감,
+3.1,saju_purchase,saju_chart_calculated,POST /api/saju/chart 200 응답 수신. 이 시점에 일간·오행이 상속 컨텍스트로 들어간다.,Y,High,elapsed_ms,요청부터 응답까지 밀리초.,Number,180,계산 지연 — 순수 계산이라 느리면 인프라 문제,
+4.1,saju_purchase,saju_chart_failed,계산 API 가 실패했거나 백엔드에 닿지 못했다.,Y,Medium,error_code,서버가 준 코드. 닿지 못했으면 network.,String,invalid_birth | network,실패 사유별 빈도,사용자 입력이 담긴 에러 메시지를 그대로 싣지 않는다
+4.2,saju_purchase,saju_chart_failed,,Y,Medium,http_status,HTTP 상태. 네트워크 실패는 0.,Number,422,4xx 와 5xx 의 분리,
+4.3,saju_purchase,saju_chart_failed,,Y,Low,elapsed_ms,실패까지 소요 밀리초.,Number,5000,타임아웃 판별,
+4.4,saju_purchase,saju_chart_failed,,Y,Low,calendar_type,실패한 입력의 달력 종류.,String,lunar,음력 입력에 실패가 몰리는지,
+5.1,saju_purchase,saju_teaser_viewed,티저에 계산 결과가 렌더되고 결제 설정 조회가 끝난 시점. 저장된 결과가 없어 다시 입력하기 화면이 뜨면 발생하지 않는다.,Y,Critical,price_krw,화면에 표시된 가격. 설정을 못 받았으면 null.,Number,1000,가격 변경 전후 전환율 비교,프런트 상수 금지 — 서버가 준 값만
+5.2,saju_purchase,saju_teaser_viewed,,Y,Medium,retention_days,결제 시 보관 일수 안내값.,Number,30,보관 기간 문구가 결제에 주는 영향,
+5.3,saju_purchase,saju_teaser_viewed,,Y,High,is_payment_enabled,결제 UI 가 켜져 있는가.,Boolean,true,무료 모드 기간의 분리,report_tier 와 같은 원천이지만 티저에서만 명시 기록
+6.1,saju_purchase,saju_purchase_clicked,결제 CTA 클릭. 주문 생성 API 호출 직전.,Y,Critical,price_krw,결제 시도 금액.,Number,1000,티저에서 결제 클릭까지의 전환율,
+6.2,saju_purchase,saju_purchase_clicked,,Y,High,payment_method,고른 결제 수단.,String,card | transfer,수단별 완주율,토스 결제창 내부는 추적 불가 — 수단은 여기서만 잡힌다
+6.3,saju_purchase,saju_purchase_clicked,,Y,Medium,product_id,상품 식별자.,String,saju_report_v1,상품 버전별 매출,가격·구성이 바뀌면 v2 로 올린다
+6.4,saju_purchase,saju_purchase_clicked,,Y,Medium,teaser_seconds,티저 노출부터 클릭까지 초.,Number,73,고민 시간 — 짧을수록 즉흥 구매,
+6.5,saju_purchase,saju_purchase_clicked,,Y,Low,retry_index,이 화면에서 몇 번째 결제 시도인가.,Number,0,실패 후 재시도가 실제로 쓰이는지,
+7.1,saju_purchase,saju_checkout_opened,주문 생성 성공 + 토스 결제창 호출 직전. 직후 브라우저가 토스로 넘어간다.,Y,High,price_krw,서버가 확정한 주문 금액.,Number,1000,클릭 금액과 주문 금액의 불일치 감지,
+7.2,saju_purchase,saju_checkout_opened,,Y,High,payment_method,결제창을 연 수단.,String,card,수단별 결제창 도달률,
+7.3,saju_purchase,saju_checkout_opened,,Y,Low,product_id,상품 식별자.,String,saju_report_v1,,
+7.4,saju_purchase,saju_checkout_opened,,Y,Low,order_created_ms,주문 생성 API 왕복 밀리초.,Number,240,결제창이 열리기까지의 체감 지연,주문번호는 전송 금지 — 결제 자격증명의 한 조각이다
+8.1,saju_purchase,saju_payment_confirmed,승인 API 200. 매출이 확정되는 단 한 순간이다.,Y,Critical,price_krw,승인된 금액.,Number,1000,세그먼트용 금액,금액 집계는 이 속성이 아니라 함께 보내는 Revenue 가 한다
+8.2,saju_purchase,saju_payment_confirmed,,Y,High,product_id,상품 식별자.,String,saju_report_v1,상품별 매출,
+8.3,saju_purchase,saju_payment_confirmed,,Y,Medium,confirm_elapsed_ms,리다이렉트 도착부터 승인 완료까지 밀리초.,Number,1400,승인 대기 중 이탈,
+8.4,saju_purchase,saju_payment_confirmed,,Y,Medium,is_report_ready,승인 시점에 리포트가 이미 있었는가.,Boolean,false,결제 직후 기다림이 필요한 비율,거짓이면 다음 화면이 폴링한다
+8.5,saju_purchase,saju_payment_confirmed,,Y,Critical,(Revenue),같은 순간에 Amplitude Revenue 로 productId·price·quantity 를 따로 보낸다.,-,saju_report_v1 / 1000 / 1,매출·LTV·ROAS,일반 이벤트 속성의 숫자는 매출로 집계되지 않는다. 이중 집계는 없다
+9.1,saju_purchase,saju_payment_failed,주문 생성·결제창·승인 중 어느 단계든 실패.,Y,High,failure_stage,실패한 단계.,String,order | checkout | confirm,어느 칸에서 돈이 새는가,단계별로 이벤트를 쪼개지 않고 이 값으로 가른다
+9.2,saju_purchase,saju_payment_failed,,Y,High,error_code,서버/SDK 에러 코드.,String,saju_order_not_found | network,취소와 실패의 분리,
+9.3,saju_purchase,saju_payment_failed,,Y,Medium,http_status,HTTP 상태. SDK 오류는 0.,Number,409,재시도 가능 여부 판정,
+9.4,saju_purchase,saju_payment_failed,,Y,Medium,is_duplicate,409 인가 — 사람이 대조해야 하는 상태.,Boolean,false,환불 대상 건이 실패율 뒤에 숨지 않게,
+9.5,saju_purchase,saju_payment_failed,,Y,Low,payment_method,실패한 수단.,String,transfer,수단별 실패율,confirm 단계에서는 실리지 않는다
+9.6,saju_purchase,saju_payment_failed,,Y,Low,price_krw,시도 금액.,Number,1000,,
+9.7,saju_purchase,saju_payment_failed,,Y,Low,retry_index,몇 번째 시도였는가.,Number,1,재시도 버튼의 효과,confirm 단계에서는 실리지 않는다
+10.1,saju_purchase,saju_report_viewed,"리포트 본문이 처음 렌더된 순간. 무료는 잡 완료 시점, 유료는 토큰 조회 성공 시점. 같은 리포트의 2회차부터는 saju_report_reopened.",Y,High,report_source,모델이 썼는가 규칙 기반으로 내려갔는가.,String,llm | fallback,fallback 비율 — 키 누락·정책 실패 감시,
+10.2,saju_purchase,saju_report_viewed,,Y,High,generation_ms,이 화면이 리포트를 기다린 밀리초.,Number,18400,대기 시간 분포 — 이탈 임계 탐색,유료 경로는 서버에서 이미 끝나 있으면 짧다
+10.3,saju_purchase,saju_report_viewed,,Y,Medium,section_count,마크다운 ## 섹션 수.,Number,5,리포트 분량의 안정성,본문은 절대 전송하지 않는다
+10.4,saju_purchase,saju_report_viewed,,Y,Low,has_preamble,첫 ## 앞 머리말이 있는가.,Boolean,true,페르소나 인사 출력의 안정성,
+10.5,saju_purchase,saju_report_viewed,,Y,High,time_to_report_ms,입력 제출부터 여기까지 총 밀리초. 이어지지 않았으면 null.,Number,64000,사람이 체감하는 제품의 속도,같은 브라우저 세션에서만 잴 수 있다
+11.1,saju_purchase,saju_report_failed,리포트 생성 잡 실패(무료) 또는 토큰 조회 실패(유료).,Y,High,failure_stage,생성에서 실패했는가 가져오기에서 실패했는가.,String,job | fetch,고치는 자리가 다르다,
+11.2,saju_purchase,saju_report_failed,,Y,High,error_code,잡 실패·타임아웃·서버 코드.,String,timeout | job_failed | saju_report_generating,기다림 상한과 진짜 실패의 분리,
+11.3,saju_purchase,saju_report_failed,,Y,Medium,http_status,HTTP 상태. 잡 실패에는 실리지 않는다.,Number,409,재시도 가능 여부,fetch 단계에서만
+11.4,saju_purchase,saju_report_failed,,Y,Medium,elapsed_ms,실패까지 기다린 밀리초.,Number,120000,상한에 걸린 것인지 즉시 거절인지,결제한 사용자의 실패는 최우선 알림 대상
+12.1,saju_engagement,saju_followup_asked,프리셋 칩 클릭 또는 자유질문 전송.,Y,High,input_type,프리셋인가 자유입력인가.,String,preset | free_text,프리셋 의존도 — 목록 개편 근거,
+12.2,saju_engagement,saju_followup_asked,,Y,High,preset_key,프리셋 키. 자유입력이면 null.,String,startup | career | money | love | move | study | people | thisyear,어떤 관심사가 지배적인가,라벨이 아니라 키를 보낸다. null 은 해당 없음이고 생략과 다르다
+12.3,saju_engagement,saju_followup_asked,,Y,High,turn_index,이 리포트의 몇 번째 질문인가. 1부터.,Number,1,질문 소진 퍼널 (1→2→3),3개 소진은 이 값과 remaining_after 로 파생한다 — 별도 이벤트 없음
+12.4,saju_engagement,saju_followup_asked,,Y,Medium,text_length,자유입력 글자 수. 프리셋이면 0.,Number,37,질문의 성의와 만족도의 상관,원문은 절대 전송 금지
+12.5,saju_engagement,saju_followup_asked,,Y,Medium,remaining_before,질문 전 남은 개수.,Number,3,상한 도달률,
+13.1,saju_engagement,saju_followup_answered,추가질문 응답 수신 완료.,Y,High,input_type,프리셋/자유입력.,String,free_text,자유입력이 더 자주 규칙 기반으로 내려가는지,
+13.2,saju_engagement,saju_followup_answered,,Y,High,preset_key,프리셋 키. 자유입력이면 null.,String,money,프리셋별 응답 품질,
+13.3,saju_engagement,saju_followup_answered,,Y,Critical,turn_index,몇 번째 질문인가.,Number,2,질문 소진 퍼널의 최종 전환 지점,
+13.4,saju_engagement,saju_followup_answered,,Y,Low,text_length,자유입력 글자 수.,Number,37,,
+13.5,saju_engagement,saju_followup_answered,,Y,High,answer_source,모델이 답했는가 규칙 기반인가.,String,llm | fallback,fallback 이 잦으면 정책이 모델을 계속 튕겨내는 것,
+13.6,saju_engagement,saju_followup_answered,,Y,Medium,elapsed_ms,전송부터 응답까지 밀리초.,Number,9200,대기 시간과 다음 질문 지속률,
+13.7,saju_engagement,saju_followup_answered,,Y,Medium,remaining_after,응답 후 남은 개수.,Number,1,소진 여부 파생 (0 이면 소진),
+14.1,saju_engagement,saju_followup_failed,추가질문이 실패했다.,Y,Medium,input_type,프리셋/자유입력.,String,free_text,어느 입력이 더 자주 실패하는지,
+14.2,saju_engagement,saju_followup_failed,,Y,Low,preset_key,프리셋 키. 자유입력이면 null.,String,null,,
+14.3,saju_engagement,saju_followup_failed,,Y,High,turn_index,몇 번째 질문 자리였는가.,Number,2,유료 사용자가 산 슬롯을 잃는 빈도,
+14.4,saju_engagement,saju_followup_failed,,Y,Medium,text_length,자유입력 글자 수.,Number,210,길이 제한에 걸린 경우의 규모,
+14.5,saju_engagement,saju_followup_failed,,Y,Low,elapsed_ms,실패까지 밀리초.,Number,30000,타임아웃 판별,
+15.1,saju_engagement,saju_report_reopened,구매한 리포트를 2회차 이상 열어 본문이 렌더됨.,Y,High,view_index,몇 번째 열람인가. 2부터.,Number,2,보관 기능의 실사용 — retention_days 의 가치 검증,회차는 localStorage 로 센다. 토큰은 이벤트에 싣지 않는다
+15.2,saju_engagement,saju_report_reopened,,Y,High,days_since_purchase,첫 열람(=결제 직후)부터 경과 일수.,Number,4,재열람이 몰리는 시점 — 리마인드 발송 타이밍,내림한다. 23시간은 아직 0일
+15.3,saju_engagement,saju_report_reopened,,Y,Medium,followups_used,이 리포트에서 지금까지 쓴 질문 수.,Number,2,남은 질문이 재방문 동기인지,서버가 준 follow_ups_spent
+15.4,saju_engagement,saju_report_reopened,,Y,Low,report_source,llm/fallback.,String,llm,,
+15.5,saju_engagement,saju_report_reopened,,Y,Low,section_count,섹션 수.,Number,5,,
+15.6,saju_engagement,saju_report_reopened,,Y,Low,has_preamble,머리말 유무.,Boolean,true,,
+16.1,saju_engagement,saju_site_shared,친구에게 알려주기 클릭이 끝난 뒤. 취소·미지원도 함께 센다.,Y,High,outcome,무슨 일이 일어났나.,String,shared | copied | cancelled | unsupported | failed,공유 시트가 실제로 동작하는가 — cancelled 가 많으면 문구 문제,취소는 실패가 아니다. 한 칸에 합치면 둘 다 못 읽는다
+16.2,saju_engagement,saju_site_shared,,Y,High,surface,어느 화면의 버튼인가.,String,teaser | report,티저 공유와 완독 후 공유는 동기가 다르다,
+17.1,saju_purchase,saju_intro_completed,소개 웹툰의 마지막 패널이 뷰포트에 들어옴.,N,Low,panel_index_max,도달한 최대 패널 번호.,Number,12,소개 완주율 — 콘텐츠 길이 조정,Phase 2
+17.2,saju_purchase,saju_intro_completed,,N,Low,scroll_seconds,소개 화면 체류 초.,Number,55,완주자의 입력 착수율,Phase 2
+18.1,saju_engagement,saju_expired_report_opened,보관 기간이 지난 토큰으로 접근.,N,Low,days_since_purchase,결제일로부터 경과 일수.,Number,45,보관 기간 연장 수요,Phase 2
+18.2,saju_engagement,saju_expired_report_opened,,N,Low,error_code,에러 코드.,String,saju_report_expired,만료와 잘못된 토큰의 분리,Phase 2
+19.1,saju_engagement,saju_followup_input_abandoned,자유입력에 2자 이상 쓴 뒤 전송 없이 이탈.,N,Low,text_length,쓰다 만 글자 수.,Number,18,질문을 쓰다 포기하는 비율,Phase 2. 원문 전송 금지
+19.2,saju_engagement,saju_followup_input_abandoned,,N,Low,turn_index,몇 번째 질문 자리였는가.,Number,3,마지막 질문일수록 신중해지는지,Phase 2

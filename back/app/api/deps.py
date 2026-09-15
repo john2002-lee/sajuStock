@@ -11,7 +11,9 @@ from app.repositories.advice_verdict import AdviceVerdictRepository
 from app.repositories.batch_run import BatchRunRepository
 from app.repositories.investor_profile import InvestorProfileRepository
 from app.repositories.listed_company import ListedCompanyRepository
+from app.repositories.llm_usage import LlmUsageRepository
 from app.repositories.saju_order import SajuOrderRepository
+from app.repositories.visit import VisitRepository
 from app.repositories.watchlist import WatchlistRepository
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
@@ -29,6 +31,13 @@ def get_listed_company_repository(db: DbSession) -> ListedCompanyRepository:
 
 
 ListedCompanyRepo = Annotated[ListedCompanyRepository, Depends(get_listed_company_repository)]
+
+
+def get_llm_usage_repository(db: DbSession) -> LlmUsageRepository:
+    return LlmUsageRepository(db)
+
+
+LlmUsageRepo = Annotated[LlmUsageRepository, Depends(get_llm_usage_repository)]
 
 
 def get_watchlist_repository(db: DbSession) -> WatchlistRepository:
@@ -52,6 +61,13 @@ def get_advice_verdict_repository(db: DbSession) -> AdviceVerdictRepository:
 AdviceVerdictRepo = Annotated[
     AdviceVerdictRepository, Depends(get_advice_verdict_repository)
 ]
+
+
+def get_visit_repository(db: DbSession) -> VisitRepository:
+    return VisitRepository(db)
+
+
+VisitRepo = Annotated[VisitRepository, Depends(get_visit_repository)]
 
 
 async def get_owner_key(

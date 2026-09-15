@@ -26,11 +26,13 @@ from app.models.batch_run import BatchRun  # noqa: F401
 from app.models.document_chunk import DocumentChunkRow  # noqa: F401
 from app.models.investor_profile import InvestorProfileRow  # noqa: F401
 from app.models.listed_company import ListedCompany  # noqa: F401
+from app.models.llm_usage_day import LlmUsageDay  # noqa: F401
 from app.models.saju_order import (  # noqa: F401
     SajuFollowUpRow,
     SajuOrderRow,
     SajuReportRow,
 )
+from app.models.visit_day import VisitDay  # noqa: F401
 from app.models.watchlist import WatchlistItem  # noqa: F401
 
 # this is the Alembic Config object, which provides

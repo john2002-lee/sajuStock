@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { SAJU_EVENT } from "@/shared/analytics/events";
+import { identifyUser } from "@/shared/analytics/track";
 import { useStoredReading } from "../model/storage";
+import { trackSaju } from "../model/analytics";
+import { elapsedSince } from "../model/analytics-context";
+import { extractPreamble, splitSections } from "../model/sections";
 import { fromBirthInput } from "../services/wire";
-import { jobErrorMessage, runJob } from "../services/jobs";
+import { JobTimeoutError, jobErrorMessage, runJob } from "../services/jobs";
 import { Shaman } from "./Shaman";
 import { StartOverPrompt } from "./TeaserView";
 import { FollowUpChat } from "./FollowUpChat";
@@ -55,6 +60,7 @@ export function ReportScreen() {
     started.current = true;
 
     const controller = new AbortController();
+    const startedAt = Date.now();
 
     runJob<ReportResult>({
       startPath: "/api/saju/report/jobs",
@@ -63,11 +69,32 @@ export function ReportScreen() {
       resultOf: (envelope) => (envelope as { report?: ReportResult }).report,
       signal: controller.signal,
     })
-      .then(setReport)
+      .then((result) => {
+        setReport(result);
+
+        // 무료 경로에서는 **잡이 끝나는 순간이 곧 읽기 시작하는 순간**이다.
+        // 생성 완료를 따로 세지 않는 이유가 이것이다.
+        trackSaju(SAJU_EVENT.reportViewed, {
+          report_source: result.source,
+          generation_ms: Date.now() - startedAt,
+          section_count: splitSections(result.markdown).length,
+          has_preamble: extractPreamble(result.markdown).length > 0,
+          // 입력 제출부터 여기까지 — 사람이 체감하는 이 제품의 속도다.
+          time_to_report_ms: elapsedSince("birth_submitted") ?? null,
+        });
+        identifyUser({ preInsert: { report_tier_seen: "free" } });
+      })
       .catch((err) => {
         // 화면을 떠나서 끊은 것은 실패가 아니다. 여기서 상태를 건드리면 사라진
         // 컴포넌트에 `setState` 를 하게 된다.
         if (controller.signal.aborted) return;
+        trackSaju(SAJU_EVENT.reportFailed, {
+          failure_stage: "job",
+          // 기다리다 상한에 걸린 것과 서버가 실패를 돌려준 것은 원인이 다르다 —
+          // 앞은 용량, 뒤는 모델이나 정책이다.
+          error_code: err instanceof JobTimeoutError ? "timeout" : "job_failed",
+          elapsed_ms: Date.now() - startedAt,
+        });
         setError(
           jobErrorMessage(err, "리포트를 만들지 못했습니다. 잠시 후 다시 시도해 주세요."),
         );

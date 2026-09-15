@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+  isExpiredSessionError,
   SESSION_MAX_AGE_SECONDS,
   toBrowserSessionCookie,
   withBrowserSessionCookie,
@@ -105,5 +106,50 @@ describe("토큰 수명", () => {
     // 예전 기본값은 30일이었다.
     assert.equal(SESSION_MAX_AGE_SECONDS, 8 * 60 * 60);
     assert.ok(SESSION_MAX_AGE_SECONDS < 24 * 60 * 60);
+  });
+});
+
+/**
+ * Auth.js 가 세션 복호화에 실패했을 때 만드는 모양. 실측한 구조 그대로다 —
+ * 오류에 `type` 이 붙고, 원인은 `cause.err`, 나머지 키는 메타데이터다.
+ */
+function sessionError(code: string, type = "JWTSessionError") {
+  const inner = Object.assign(new Error('"exp" claim timestamp check failed'), {
+    code,
+  });
+  return Object.assign(new Error("JWTSessionError"), {
+    type,
+    cause: { err: inner, claim: "exp", reason: "check_failed" },
+  });
+}
+
+describe("만료된 세션 쿠키를 오류와 구분한다", () => {
+  test("수명이 다한 토큰이면 참 — 로그를 ERROR 로 남기지 않는 근거다", () => {
+    // 토큰은 8시간, 쿠키는 브라우저를 닫을 때까지다. 창을 하루 켜 두면 이 상태가
+    // **매 요청** 일어난다. 설계대로 일어나는 일이라 오류가 아니다.
+    assert.equal(isExpiredSessionError(sessionError("ERR_JWT_EXPIRED")), true);
+  });
+
+  test("서명이 안 맞으면 거짓 — 그쪽은 진짜 오류다", () => {
+    // AUTH_SECRET 을 갈아 끼웠거나 토큰이 위조된 경우다. 조용히 넘기면 안 된다.
+    assert.equal(
+      isExpiredSessionError(sessionError("ERR_JWS_SIGNATURE_VERIFICATION_FAILED")),
+      false,
+    );
+  });
+
+  test("다른 종류의 Auth.js 오류는 만료가 아니다", () => {
+    assert.equal(
+      isExpiredSessionError(sessionError("ERR_JWT_EXPIRED", "CallbackRouteError")),
+      false,
+    );
+  });
+
+  test("모양이 다른 값에 던지지 않는다", () => {
+    // 로거는 어떤 값이든 받을 수 있는 자리다. 여기서 던지면 **로그를 남기다가**
+    // 요청이 죽는다.
+    for (const value of [null, undefined, "문자열", 42, new Error("맨 오류"), {}]) {
+      assert.equal(isExpiredSessionError(value), false);
+    }
   });
 });

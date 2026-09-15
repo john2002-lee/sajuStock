@@ -57,3 +57,27 @@ function resolveSupportEmail(raw: string | undefined): string | undefined {
  * 백엔드에서 이 값을 바꾸면 `SAJU_RETENTION_DAYS` 도 함께 설정해야 한다.
  */
 export const RETENTION_DAYS = Number(process.env.NEXT_PUBLIC_SAJU_RETENTION_DAYS ?? 30);
+
+/**
+ * Amplitude 수집 키. **브라우저에 나가는 것이 정상인 값이다** — 이벤트를 어느
+ * 프로젝트로 보낼지 가리키는 공개 식별자이고, 이 키로 데이터를 읽을 수는 없다.
+ * 그래서 위의 `ADVICE_API_KEY` 류와 달리 `NEXT_PUBLIC_` 을 붙이는 것이 맞다.
+ *
+ * **미설정이면 분석이 조용히 꺼진다.** `NEXT_PUBLIC_*` 는 빌드 시점 텍스트 치환이라
+ * Vercel 에 이 변수를 넣지 않고 배포하면 번들에 `undefined` 가 박히고, 화면은 멀쩡한데
+ * 이벤트만 한 건도 안 들어온다 — 가장 알아차리기 어려운 실패다. 그래서 초기화하는
+ * 쪽(`shared/analytics`)이 값이 없을 때 콘솔에 경고를 남긴다.
+ */
+export const AMPLITUDE_API_KEY = process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY;
+
+/**
+ * 이 배포가 바깥 세상에 알려진 주소. 예: `https://aiot21.com`
+ *
+ * **절대 URL 이 필요한 곳에만 쓴다.** 화면 안의 이동은 전부 상대 경로이므로 이
+ * 값을 볼 이유가 없다. 지금 쓰는 곳은 둘이다 — 토스 결제 콜백(`PayButton`, 토스가
+ * 상대 경로를 거부한다)과 친구에게 보내는 공유 링크(`features/saju/model/share`).
+ *
+ * 단정하지 않는다. 없으면 공유 링크는 브라우저가 보고 있는 주소로 내려가고
+ * (`shareUrl` 의 `fallback`), 그 편이 빈 링크를 보내는 것보다 낫다.
+ */
+export const APP_ORIGIN = process.env.NEXT_PUBLIC_APP_ORIGIN;

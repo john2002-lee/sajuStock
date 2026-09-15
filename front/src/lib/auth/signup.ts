@@ -109,7 +109,7 @@ export async function sendVerificationEmail(email: string, url: string): Promise
     await nodemailer.createTransport(server).sendMail({
       to: email,
       from,
-      subject: "종목 원장 — 이메일 인증",
+      subject: "FEEL — 이메일 인증",
       text: `아래 주소를 열면 가입이 끝납니다. 24시간 안에 열어 주세요.\n\n${url}\n`,
     });
   } catch (error) {

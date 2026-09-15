@@ -26,12 +26,14 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.repositories.admin import AdminRepository, AdminUserRow
 from app.repositories.batch_run import BatchRunRepository
 from app.repositories.listed_company import ListedCompanyRepository
+from app.repositories.llm_usage import LlmUsageRepository, LlmUsageSummary
 from app.services import advice_cache
 
 logger = logging.getLogger(__name__)
@@ -343,6 +345,9 @@ class OpsSnapshot:
     rag_enabled: bool
     #: 배치 실행 기록 (`batch_runs`). 조용히 틀리는 경로의 **경보가 도착하는 곳**이다
     batches: list[BatchStatus]
+    #: AI 토큰 사용량 (`llm_usage_days`). 캐시 현황과 **다른 질문**에 답한다 —
+    #: 그쪽은 재시작하면 0 이 되는 현재 상태고, 이쪽은 누적이라 남는다
+    token_usage: LlmUsageSummary
     generated_at: str
 
 
@@ -379,8 +384,33 @@ async def _batch_statuses(runs: BatchRunRepository) -> list[BatchStatus]:
     return statuses
 
 
+async def _token_usage_or_empty(usage: LlmUsageRepository) -> LlmUsageSummary:
+    """토큰 사용량. **못 읽어도 화면 전체를 막지 않는다.**
+
+    이 조회 하나가 500 이 되면 운영 현황의 **모든 것**이 사라진다 — 배치 적재율,
+    마지막 실행 시각, 그리고 무엇보다 "AI 판단 엔드포인트가 안 잠겨 있다" 는 경고다.
+    조용히 열려 있는 자물쇠를 못 보게 되는 것이 이 화면에서 가장 나쁜 결과이고,
+    그것을 **새로 붙인 부가 정보 하나** 때문에 잃을 수는 없다.
+
+    구체적으로는 백엔드가 `alembic upgrade head` 보다 먼저 배포된 순간이다.
+    `llm_usage_days` 가 아직 없어 `UndefinedTable` 이 나고, 등록된 핸들러가 없으니
+    그대로 500 이 된다. 그때 화면은 "아직 기록이 없습니다" 를 보여야 맞다 —
+    사실이 그렇고, 0 은 이미 그 화면이 그릴 줄 아는 모양이다.
+    """
+    try:
+        return await usage.summary()
+    except SQLAlchemyError:
+        logger.warning(
+            "AI 토큰 사용량을 읽지 못했습니다 — 나머지 운영 현황은 그대로 보여 줍니다",
+            exc_info=True,
+        )
+        return LlmUsageSummary.empty()
+
+
 async def get_ops_snapshot(
-    listings: ListedCompanyRepository, runs: BatchRunRepository
+    listings: ListedCompanyRepository,
+    runs: BatchRunRepository,
+    usage: LlmUsageRepository,
 ) -> OpsSnapshot:
     """운영 현황 한 벌.
 
@@ -410,5 +440,6 @@ async def get_ops_snapshot(
         advice_locked=settings.advice_auth_enabled,
         rag_enabled=settings.rag_enabled,
         batches=await _batch_statuses(runs),
+        token_usage=await _token_usage_or_empty(usage),
         generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )

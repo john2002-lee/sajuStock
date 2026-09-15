@@ -23,10 +23,16 @@ LLM SDK 에 대해 지키는 것과 같은 규칙이고, 이유도 같다. 계�
 
   * 주식 — `full` + PII 마스킹. 프롬프트가 공개 종목 정보라 본문을 봐야 판단
     근거를 되짚을 수 있다.
-  * 사주 — `metadata_only`. **생년월일시는 민감정보이고**, 이 저장소는 이미 그
-    판단을 내려 두었다 (`services/saju_service.read_chart` 는 예외 메시지에서도
-    그 값을 뺀다). 내장 마스킹은 이메일·전화·카드·SSN 기준이라 생년월일시를
-    걸러 주지 않는다 — 그러므로 본문을 아예 보내지 않는다. 토큰·지연·비용만 남는다.
+  * 사주 — `metadata_only`. 프롬프트에 생년월일시 **원본이 실리지는 않는다**
+    (실측: `build_prompt` 결과에 연·월·일·시·출생지 문자열이 없다). 실리는 것은
+    사주 원국 네 기둥과 대운이다. 그런데 그 조합은 **역산된다** — 네 기둥이
+    특정 날짜의 두 시간 창을 가리키고, 대운 시작 나이와 "현재" 구간이 연도를
+    좁힌다. 즉 가명화된 생년월일시이지 익명 데이터가 아니다.
+
+    이 저장소는 이미 그 값을 민감정보로 다루기로 했고(`saju_service.read_chart`
+    는 예외 메시지에서도 뺀다), 내장 PII 마스킹은 이메일·전화·카드·SSN 기준이라
+    네 기둥을 걸러 주지 않는다 — 그러므로 본문을 아예 보내지 않는다.
+    토큰·지연·비용만 남는다.
 
 `content_mode` 는 `AmplitudeAI` 인스턴스 단위라 인스턴스를 둘 두고, 기반
 `Amplitude` 클라이언트(전송·배치)는 하나를 공유한다.
@@ -47,6 +53,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from uuid import uuid4
 
 from app.core.config import settings
 
@@ -106,7 +113,7 @@ if ENABLED:
     }
     SAJU_REPORT = _ai_metadata_only.agent(
         "saju-report",
-        description="사주 리포트를 생성한다 (본문 미수집 — 생년월일시는 민감정보)",
+        description="사주 리포트를 생성한다 (본문 미수집 — 사주 원국은 생년월일시로 역산된다)",
     )
 
     def _flush_impl() -> None:
@@ -122,6 +129,44 @@ if ENABLED:
         _amplitude.flush()
 
     _flush = _flush_impl
+
+
+#: 신원 없는 호출에 붙일 일회용 식별자의 접두.
+#:
+#: 대시보드에서 이 접두를 보면 **사람이 아니라 호출 한 건**이라는 뜻이다. 사주는
+#: 로그인이 없고 그래서 `user_id` 가 비는데, Amplitude SDK 는 `user_id` 와
+#: `device_id` 가 **둘 다 비면 이벤트를 버린다** (`amplitude/plugin.verify_event`).
+#: 그게 조용한 폐기라 로그에도 "Invalid event" 한 줄만 남고, 계측이 통째로 안 되는
+#: 상태가 한동안 보이지 않았다.
+_THROWAWAY_PREFIX = "throwaway:"
+
+
+def _identity(user_id: str | None) -> dict[str, str | None]:
+    """Amplitude 에 보낼 신원 한 벌. **둘 중 하나는 반드시 채운다.**
+
+    이 불변식이 깨지면 SDK 가 이벤트를 조용히 버린다 — 예외도 재시도도 없고 로그에
+    "Invalid event" 한 줄만 남는다(`amplitude/plugin.verify_event`). 실제로 사주 LLM
+    계측이 그 상태로 한동안 **한 건도 도착하지 않았다.** 판단을 한 줄 인라인으로 두면
+    다음 사람이 같은 자리를 다시 비울 수 있어서, 테스트할 수 있는 함수로 꺼냈다.
+    """
+    if user_id:
+        return {"user_id": user_id, "device_id": None}
+    return {"user_id": None, "device_id": _throwaway_device_id()}
+
+
+def _throwaway_device_id() -> str:
+    """호출 한 건짜리 식별자. **신원이 아니다.**
+
+    "없는 신원을 지어내지 않는다" 는 원칙은 그대로다 — 이 값은 저장되지도, 다음
+    요청에서 다시 쓰이지도 않는다. 쿠키·헤더 어디에서도 오지 않고 여기서 나서
+    여기서 끝난다. 사람을 가로질러 이을 수 있는 것이 하나도 없다.
+
+    **대가는 대시보드의 기기 수다.** 리포트 한 건이 곧 기기 하나로 세어지므로
+    "사용자 수" 류의 지표는 이 경로에서 뜻이 없다. 그 숫자는 프런트 SDK 가 device
+    ID 로 이미 제대로 세고 있고(`shared/analytics`), 여기서 보려는 것은 **토큰·지연
+    ·오류**다 — 그쪽은 이 값이 무엇이든 옳게 나온다.
+    """
+    return f"{_THROWAWAY_PREFIX}{uuid4()}"
 
 
 def _reset(token) -> None:
@@ -171,8 +216,12 @@ async def session(
         # `idle_timeout_minutes=-1` 은 만료를 끄는 값이다 (SDK `client.py` 주석).
         # 이 앱의 session_id 는 (소유자, 종목) 으로 **영구**하고 요청마다 열고 닫힌다 —
         # 기본 타임아웃을 두면 다음 요청이 이미 종료·보강된 대화를 되살리는 꼴이 된다.
+        # 신원이 비면 `_identity` 가 일회용 식별자를 채운다. 세션 하나에 하나이므로
+        # 리포트 한 건의 여러 LLM 호출은 같은 값을 쓴다.
         cm = agent.session(
-            user_id=user_id, session_id=session_id, idle_timeout_minutes=-1
+            **_identity(user_id),
+            session_id=session_id,
+            idle_timeout_minutes=-1,
         )
         entered = await cm.__aenter__()
     except Exception:

@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { bff } from "@/lib/http/browser";
+import { SAJU_EVENT } from "@/shared/analytics/events";
+import { identifyUser } from "@/shared/analytics/track";
 import type { BirthInput } from "../model/types";
+import { trackSaju } from "../model/analytics";
+import { startTimer } from "../model/analytics-context";
 import { fromBirthInput } from "../services/wire";
 import { jobErrorMessage, runJob } from "../services/jobs";
 import { Panel, PanelLabel, SpeechBubble } from "./Panel";
@@ -201,6 +205,26 @@ export function FollowUpChat({
     setPending(true);
     setNotice(null);
 
+    const isPreset = "preset_key" in body;
+    // 이 리포트의 몇 번째 질문인가. 소진(3개)은 이 값과 `remaining_after` 로
+    // 파생되므로 별도 이벤트를 두지 않는다.
+    const turnIndex = spent + 1;
+    const askedProperties = {
+      input_type: isPreset ? "preset" : "free_text",
+      // 프리셋이 아니면 **해당 없음**이다. 생략하면 계측이 빠진 것과 구분되지 않는다.
+      preset_key: isPreset ? body.preset_key : null,
+      turn_index: turnIndex,
+      // 자유 입력의 **원문은 절대 보내지 않는다.** 길이만으로도 "성의껏 쓴 질문이
+      // 더 만족스러운 답을 받는가" 를 볼 수 있다.
+      text_length: isPreset ? 0 : ("text" in body ? body.text.length : 0),
+    } as const;
+
+    trackSaju(SAJU_EVENT.followUpAsked, {
+      ...askedProperties,
+      remaining_before: remaining,
+    });
+
+    const elapsed = startTimer();
     try {
       const data = await runJob<{
         question: string;
@@ -217,6 +241,16 @@ export function FollowUpChat({
         },
         resultOf: (envelope) => (envelope as { answer?: FollowUpAnswer }).answer,
       });
+
+      trackSaju(SAJU_EVENT.followUpAnswered, {
+        ...askedProperties,
+        // 모델이 답했는가, 규칙 기반으로 내려갔는가. 후자가 많아지면 프리셋이나
+        // 정책이 모델을 계속 튕겨내고 있다는 뜻이다.
+        answer_source: data.source,
+        elapsed_ms: elapsed(),
+        remaining_after: Math.max(0, remaining - 1),
+      });
+      identifyUser({ add: { followup_total_count: 1 } });
 
       setTurns((prev) => [
         ...prev,
@@ -252,6 +286,10 @@ export function FollowUpChat({
         setSpent((n) => n + 1);
       }
     } catch (error) {
+      trackSaju(SAJU_EVENT.followUpFailed, {
+        ...askedProperties,
+        elapsed_ms: elapsed(),
+      });
       // 422 는 입력이 규칙에 안 맞는 경우다(길이 등). `jobErrorMessage` 가 서버
       // 문장을 우선하므로 그것이 그대로 뜬다 — 그쪽이 사용자 텍스트를 빼고 사유만
       // 담아 준다.

@@ -20,6 +20,7 @@ export { PaySuccessScreen } from "./components/PaySuccessScreen";
 export { PayFailNotice } from "./components/PayFailNotice";
 export { PaidReportScreen } from "./components/PaidReportScreen";
 export { PayButton, type PayButtonProps } from "./components/PayButton";
+export { ShareButton } from "./components/ShareButton";
 
 /** 웹툰 조각 — 다른 화면이 같은 목소리를 이어 쓸 때를 위해 연다. */
 export { Panel, PanelLabel, ShamanBeat, SpeechBubble } from "./components/Panel";
@@ -44,6 +45,13 @@ export {
   clearReading,
   type StoredReading,
 } from "./model/storage";
+export {
+  shareLink,
+  shareUrl,
+  type ShareCapabilities,
+  type ShareOutcome,
+  type ShareTarget,
+} from "./model/share";
 
 export type {
   BirthInput,

@@ -33,7 +33,7 @@ import { shareLink, shareUrl, type ShareOutcome } from "../model/share";
  */
 
 /** 공유 시트에 실리는 문구. OS 가 버릴 수도 있지만, 살면 받는 쪽이 먼저 읽는다. */
-const TITLE = "FEEL · 사주팔자";
+const TITLE = "AI Of Tellers · 사주팔자";
 const TEXT = "태어난 시각을 진태양시로 바로잡은 사주 여덟 글자. 회원가입 없이 볼 수 있어요.";
 
 /** 결과 → 버튼에 남길 말. `shared` 는 시트가 이미 말해 줬으므로 조용하다. */

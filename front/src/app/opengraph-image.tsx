@@ -32,7 +32,7 @@ import { ImageResponse } from "next/og";
  * 때문이다(`features/saju/model/share.ts`). 그래서 `params` 도, 조회도 없다.
  */
 
-export const alt = "FEEL · 진태양시 보정을 적용한 사주팔자";
+export const alt = "AI Of Tellers · 진태양시 보정을 적용한 사주팔자";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -47,6 +47,9 @@ const HAIRLINE = "rgba(176, 132, 50, 0.28)";
 
 /** 오행 다섯 색. 카드 아래 띠 하나로 "무엇에 대한 사이트인지" 를 말한다. */
 const WUXING = ["#3f7a52", "#b4452f", "#9a7b33", "#8a8f96", "#35597f"];
+
+/** 제호의 AIOT 강조색 = 오행의 수(水). 화면 쪽 `BrandName` 과 같은 값이다. */
+const WATER = WUXING[4];
 
 export default async function Image() {
   // `process.cwd()` 는 Next 프로젝트 디렉터리(= front/)다.
@@ -70,7 +73,20 @@ export default async function Image() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <div style={{ display: "flex", fontSize: 46, color: GOLD }}>FEEL</div>
+          {/* 제호. 화면의 `BrandName` 과 같은 규칙으로 AIOT 네 글자만 수(水) 색이다.
+              여기서는 컴포넌트를 쓸 수 없어(satori 는 인라인 스타일만 읽는다) 같은
+              조판을 손으로 짠다 — 낱말 사이는 `gap` 이 띄운다. */}
+          <div style={{ display: "flex", fontSize: 46, gap: 13, color: MUTED }}>
+            <div style={{ display: "flex", color: WATER }}>AI</div>
+            <div style={{ display: "flex" }}>
+              <div style={{ display: "flex", color: WATER }}>O</div>
+              <div style={{ display: "flex" }}>f</div>
+            </div>
+            <div style={{ display: "flex" }}>
+              <div style={{ display: "flex", color: WATER }}>T</div>
+              <div style={{ display: "flex" }}>ellers</div>
+            </div>
+          </div>
           <div style={{ display: "flex", fontSize: 24, color: MUTED, letterSpacing: 8 }}>
             SAJU
           </div>

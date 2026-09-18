@@ -15,7 +15,7 @@ import "./globals.css";
  * 계정 · 법적 문서. 사주(`(saju)`)와 주식(`(stock)`)은 각자 자기 레이아웃에서
  * `absolute` 로 덮는다.
  *
- * 제품 이름은 **FEEL** 이다. 예전에는 여기 기본값이 "종목 원장 · The Stock Ledger"
+ * 제품 이름은 **AI Of Tellers** 이다. 예전에는 여기 기본값이 "종목 원장 · The Stock Ledger"
  * 였는데, 주식이 개발 전용으로 내려가고 사주가 메인이 되면서 그 이름이 제품 전체를
  * 대표하지 않게 됐다 — 404 를 만난 사주 사용자가 주식 서비스 이름을 탭 제목으로
  * 보는 상태였다.
@@ -33,10 +33,10 @@ export const metadata: Metadata = {
    */
   metadataBase: resolveMetadataBase(),
   title: {
-    default: "FEEL · 사주팔자",
+    default: "AI Of Tellers · 사주팔자",
     // 서비스 레이아웃이 각자 자기 템플릿을 두므로 여기 템플릿은 그룹 밖 화면
     // (404 · 관리자 · 계정 · 법적 문서)에만 걸린다.
-    template: "%s · FEEL",
+    template: "%s · AI Of Tellers",
   },
   description:
     "진태양시 보정을 적용한 사주팔자. 회원가입 없이 여덟 글자를 확인하세요.",
@@ -55,10 +55,10 @@ export const metadata: Metadata = {
    */
   openGraph: {
     type: "website",
-    siteName: "FEEL",
+    siteName: "AI Of Tellers",
     locale: "ko_KR",
     url: "/",
-    title: "FEEL · 사주팔자",
+    title: "AI Of Tellers · 사주팔자",
     description: "진태양시 보정을 적용한 사주팔자. 회원가입 없이 여덟 글자를 확인하세요.",
   },
 };

@@ -18,7 +18,7 @@ import { MarketTiles, MarketTilesSkeleton } from "./_components/MarketTiles";
  *
  * ```
  * ┌──────────────┬──────────────────────────────────────────┐
- * │ 관심 종목     │  FEEL.               검색 · 테마 · 계정   │  Masthead
+ * │ 관심 종목     │  AI Of Tellers.               검색 · 테마 · 계정   │  Masthead
  * │ n종목·n그룹   │  기준 시각 · 시세 지연                    │   제호 위, 캡션 아래
  * │ [편집][추가]  │ ─────────────────────────────────────────│
  * │ [AI 분석]     │  선택된 종목 상세  (children)             │

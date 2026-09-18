@@ -36,12 +36,12 @@ import { SajuHeader } from "@/features/saju";
  * ## `default` 가 아니라 `absolute` 인 이유
  *
  * `title.default` 는 부모의 `template` 을 뒤집어쓴다(Next 16 `generate-metadata.md`).
- * 루트가 `"%s · FEEL"` 을 갖고 있어 `default` 로 두면 제목이 두 번 붙는다.
+ * 루트가 `"%s · AI Of Tellers"` 을 갖고 있어 `default` 로 두면 제목이 두 번 붙는다.
  * `absolute` 는 부모 템플릿을 무시하면서 하위 화면의 기본 제목 노릇은 한다.
  */
 export const metadata: Metadata = {
   title: {
-    absolute: "FEEL · 사주팔자",
+    absolute: "AI Of Tellers · 사주팔자",
     template: "%s · 사주",
   },
   description: "진태양시 보정을 적용한 사주팔자. 회원가입 없이 여덟 글자를 확인하세요.",

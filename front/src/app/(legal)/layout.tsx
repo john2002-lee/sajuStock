@@ -23,7 +23,7 @@ import type { Metadata } from "next";
  * 그쪽에서 명암비까지 재서 고친 값이라 여기서 다시 정할 이유가 없다.
  */
 export const metadata: Metadata = {
-  title: { template: "%s · FEEL", default: "약관" },
+  title: { template: "%s · AI Of Tellers", default: "약관" },
 };
 
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
@@ -36,7 +36,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
           href="/"
           className="font-display text-[17px] text-ink hover:text-muted-65"
         >
-          FEEL
+          AI Of Tellers
         </Link>
       </header>
 

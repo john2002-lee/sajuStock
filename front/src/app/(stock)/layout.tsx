@@ -21,8 +21,8 @@ import { Footer } from "@/shared/components/layout/Footer";
  *
  * `title.default` 는 **부모의 `template` 을 그대로 뒤집어쓴다**(Next 16
  * `generate-metadata.md`: "It will augment `title.template` from the closest parent
- * segment if it exists"). 루트가 `"%s · FEEL"` 을 갖고 있으므로 여기서
- * `default` 를 쓰면 제목이 "… · FEEL · FEEL" 이 된다 — 실제로 그렇게 나왔다.
+ * segment if it exists"). 루트가 `"%s · AI Of Tellers"` 을 갖고 있으므로 여기서
+ * `default` 를 쓰면 제목이 "… · AI Of Tellers · AI Of Tellers" 이 된다 — 실제로 그렇게 나왔다.
  * `absolute` 는 부모 템플릿을 무시하면서 하위 화면의 기본 제목 노릇은 그대로 한다.
  *
  * ## 여기가 하지 않는 일 — 하단 탭바
@@ -34,8 +34,8 @@ import { Footer } from "@/shared/components/layout/Footer";
  */
 export const metadata: Metadata = {
   title: {
-    absolute: "주식 · FEEL",
-    template: "%s · 주식 · FEEL",
+    absolute: "주식 · AI Of Tellers",
+    template: "%s · 주식 · AI Of Tellers",
   },
   description: "KRX·해외 종목의 주가·뉴스·리포트와 멀티 에이전트 AI 판단",
 };

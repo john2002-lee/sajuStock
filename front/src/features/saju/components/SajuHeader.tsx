@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Icon } from "@/shared/ui";
 import { ThemeChoice } from "@/shared/theme";
+import { BrandName } from "@/shared/components/layout/BrandName";
 
 /**
  * 사주 화면의 상단 헤더.
@@ -77,9 +78,11 @@ export function SajuHeader({ account }: { account?: ReactNode }) {
         <Link
           href="/"
           className="flex min-h-[var(--tap)] items-center gap-2 font-display text-[17px] text-gold-text-strong"
-          aria-label="FEEL 처음으로"
+          aria-label="AI Of Tellers 처음으로"
         >
-          FEEL
+          {/* 이름이 길어졌다(FEEL → AI Of Tellers). `whitespace-nowrap` 이 없으면
+              좁은 화면에서 "Tellers" 가 아래로 접혀 제호가 두 줄이 된다. */}
+          <BrandName className="whitespace-nowrap" />
           <span className="font-mono-kr text-[9.5px] tracking-[0.2em] text-muted-2">SAJU</span>
         </Link>
 

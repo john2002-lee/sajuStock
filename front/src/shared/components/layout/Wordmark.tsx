@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { BrandName } from "./BrandName";
 
 /**
  * 제품명 워드마크 겸 홈 버튼. 모든 화면 좌상단에 같은 자리·같은 모양으로 놓인다.
  *
- * ## 이름이 FEEL 이고 영문 부제가 없다
+ * ## 이름이 AI Of Tellers 이고 영문 부제가 없다
  *
  * 여기에는 "종목 원장. The Stock Ledger" 가 있었다. 주식이 개발 전용으로 내려가고
  * 사주가 메인이 되면서 그 이름은 제품이 아니라 **한쪽 서비스**를 가리키게 됐다.
@@ -15,7 +16,10 @@ import Link from "next/link";
  *
  * 이미지·SVG 가 아니라 텍스트다 — 제호(Masthead)가 이미 Noto Serif KR 로
  * 조판돼 있고, 같은 글자를 이미지로 다시 만들면 테마 반전 때 색이 따라오지 않는다.
- * 색은 `text-ink` 하나로 두어 라이트/터미널 모두 배경 대비 전경색을 그대로 받는다.
+ * 색은 `BrandName` 이 든다(AIOT 네 글자만 수(水) 색으로 도드라진다).
+ *
+ * 예전 이름 뒤에 있던 마침표(`FEEL.`)는 뗐다. 한 단어일 때는 종지부가 제호의
+ * 리듬을 만들었지만, `AI Of Tellers` 처럼 세 낱말이 이어지면 문장 끝처럼 읽힌다.
  *
  * variant
  *  - "masthead" 신문 제호. 3b 홈·2a 상세·4b 관심종목 헤더용 (모바일 20 → 데스크탑 24px)
@@ -41,16 +45,12 @@ export function Wordmark({
     return (
       <Link
         href={href}
-        aria-label="FEEL 처음으로"
+        aria-label="AI Of Tellers 처음으로"
         // -mx/-my 로 히트 영역만 44px 로 넓히고 글자 위치는 그대로 둔다.
         // 좁은 바 안에서 min-h-11 을 그냥 주면 바 높이가 같이 늘어난다.
         className="-my-2 flex min-h-[var(--tap)] items-center py-2 text-ink"
       >
-        <span
-          className="font-display font-bold leading-none tracking-[-0.01em] text-20"
-        >
-          FEEL<span className="text-up">.</span>
-        </span>
+        <BrandName className="whitespace-nowrap font-display font-bold leading-none tracking-[-0.01em] text-20" />
       </Link>
     );
   }
@@ -58,14 +58,12 @@ export function Wordmark({
   return (
     <Link
       href={href}
-      aria-label="FEEL 처음으로"
+      aria-label="AI Of Tellers 처음으로"
       // min-w-0: 마스트헤드 우측 덩어리(검색·토글·액션)와 폭을 다툴 때 이쪽이
       // 먼저 줄어들 수 있게 한다. 없으면 캡션 길이만큼 헤더가 밀려 나간다.
       className="-my-1 flex min-w-0 min-h-[var(--tap)] flex-col justify-center gap-[3px] py-1 text-ink"
     >
-      <span className="whitespace-nowrap font-display font-bold leading-none tracking-[-0.01em] text-20 md:text-26">
-        FEEL<span className="text-up">.</span>
-      </span>
+      <BrandName className="whitespace-nowrap font-display font-bold leading-none tracking-[-0.01em] text-20 md:text-26" />
       {caption ? (
         // 캡션은 잘려도 되는 부가 정보다 — 시세 지연 고지가 길어져도 제호가 접히거나
         // 우측 컨트롤을 화면 밖으로 밀지 않는다.

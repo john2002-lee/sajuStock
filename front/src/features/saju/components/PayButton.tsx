@@ -51,7 +51,7 @@ interface OrderCreated {
   amount: number;
 }
 
-export function PayButton({ birth, amount, orderName = "FEEL 정밀 사주 리포트" }: PayButtonProps) {
+export function PayButton({ birth, amount, orderName = "AI Of Tellers 정밀 사주 리포트" }: PayButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 카드가 먼저다 — 대부분이 그것을 먼저 집는다. 계좌이체는 카드사 인증이

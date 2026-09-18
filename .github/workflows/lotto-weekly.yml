@@ -1,0 +1,71 @@
+# 매주 새 로또 회차를 받아 `front/src/features/lotto/_data/draws.json` 에 붙인다.
+#
+# 화면은 이 파일의 집계로 번호를 뽑는다. 그래서 갱신 커밋이 곧 배포다 — front/ 가
+# 바뀌면 Vercel 이 자동으로 올린다. 별도 배포 단계가 없는 이유가 이것이다.
+#
+# `back-deploy.yml` 은 `paths: back/**` 이라 이 커밋에 반응하지 않는다.
+#
+# ## 의존성을 설치하지 않는다
+#
+# 스크립트는 Node 내장(fetch · fs)만 쓴다. `npm ci` 없이 `npm run` 만으로 돌아가므로
+# 실행이 20초 안에 끝난다. 설치 단계를 넣으면 이 워크플로의 목적(주 1회 한 건
+# 받아오기)에 비해 과하다.
+#
+# ## 왜 두 번 도나
+#
+# 추첨은 토요일 저녁이고 첫 실행이 그날 밤이다. GitHub 의 스케줄은 러너가 붐빌 때
+# 수십 분 밀리거나 아예 건너뛰므로, 일요일 낮에 한 번 더 확인한다. 신규 회차가
+# 없으면 스크립트가 파일을 건드리지 않아 두 번째 실행은 아무 일도 하지 않는다.
+#
+# 여러 주가 밀린 경우도 스크립트가 알아서 따라잡는다(한 번에 최대 8회차).
+
+name: lotto weekly
+
+on:
+  schedule:
+    # cron 은 UTC 다. 추첨은 토요일 20:45 KST 경이고, 결과가 API 에 실릴 여유를 둔다.
+    - cron: '30 13 * * 6' # 토 22:30 KST
+    - cron: '0 3 * * 0' # 일 12:00 KST — 위가 밀렸거나 건너뛰어졌을 때의 보강
+  workflow_dispatch:
+
+# 데이터 커밋을 푸시해야 한다. GITHUB_TOKEN 으로 충분하다 — 장기 자격증명을 두지
+# 않는다(저장소가 공개다).
+permissions:
+  contents: write
+
+# 두 스케줄이 겹치더라도 같은 파일에 동시에 쓰지 않게 줄을 세운다.
+concurrency:
+  group: lotto-weekly
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 스크립트가 `.ts` 를 플래그 없이 실행한다(Node 의 타입 스트리핑).
+          # 그 동작은 22.18 부터 안정이므로 마이너까지 박는다 — `'22'` 로 두면
+          # 러너의 기본 22.x 가 내려가는 날 조용히 깨진다.
+          node-version: '22.18'
+
+      - name: 새 회차 받기
+        working-directory: front
+        run: npm run lotto:update
+
+      - name: 변경이 있으면 커밋
+        run: |
+          DATA=front/src/features/lotto/_data/draws.json
+          if git diff --quiet -- "$DATA"; then
+            echo "갱신된 내용이 없습니다. 커밋하지 않습니다."
+            exit 0
+          fi
+
+          ROUND=$(jq -r '.latestRound' "$DATA")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DATA"
+          git commit -m "chore: update lotto draw data through round ${ROUND}"
+          git push

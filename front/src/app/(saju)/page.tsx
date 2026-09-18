@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { SajuEntry } from "@/features/saju";
 import { getBirthPlaces } from "@/features/saju/server";
+import { LottoSection } from "@/features/lotto/server";
 import type { Metadata } from "next";
 
 /**
@@ -39,5 +41,25 @@ export const revalidate = 0;
 
 export default async function HomePage() {
   const places = await getBirthPlaces();
-  return <SajuEntry places={places} />;
+  return (
+    <>
+      <SajuEntry places={places} />
+      {/* 로또 조합은 **폼 다음** 이다. 이 화면에 온 사람이 하러 온 일은 사주
+          입력이고, 로또는 그 일을 마치거나 내려보다가 만나면 된다. 앞에 두면
+          입력 칸을 접힘 아래로 밀어낸다.
+
+          `/lotto` 로 가는 링크를 함께 둔다 — 그 페이지가 검색으로 들어오는 입구인데,
+          사이트 안에서 아무도 가리키지 않으면 색인이 잡히지 않는다. */}
+      <LottoSection
+        action={
+          <Link
+            href="/lotto"
+            className="text-[13px] text-gold-text underline underline-offset-2 hover:text-gold-text-strong"
+          >
+            행운의 번호만 따로 보기
+          </Link>
+        }
+      />
+    </>
+  );
 }

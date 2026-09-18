@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import ./test/register.mjs --test \"src/**/*.test.ts\""
+    "test": "node --import ./test/register.mjs --test \"src/**/*.test.ts\"",
+    "lotto:update": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/update-lotto-draws.ts"
   },
   "dependencies": {
     "@amplitude/unified": "^1.1.32",

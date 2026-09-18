@@ -1,3 +1,4 @@
+import { Icon } from "@/shared/ui";
 import { kstStamp } from "../model/clock";
 import { generateSets } from "../model/generate";
 import { getLottoSnapshot } from "../services/getLottoStats";
@@ -55,8 +56,31 @@ import { NumberBalls } from "./NumberBalls";
  * 조합" 이 그 자리이고, 둘 다 숫자를 말하지 않으면서 사실이다.
  */
 
-/** 세트 이름. 숫자로 매기면 화면의 번호들과 섞여 읽힌다. */
-const SET_LABELS = ["A", "B", "C"] as const;
+/**
+ * 세트를 가르는 표식.
+ *
+ * 처음에는 `A · B · C` 였다. 글자로 매기면 화면의 숫자들과 섞여 읽히지 않는다는
+ * 점은 해결했지만, 금빛 공 여섯 개 옆에 회색 알파벳 하나가 서 있는 모양이 무엇도
+ * 말하지 않았다.
+ *
+ * 해 · 달 · 별을 쓴다. 셋이 서로 확실히 구별되고(잎과 행성처럼 헷갈리는 짝이
+ * 없다), 진태양시를 계산하는 사이트의 결과 맞는다. 순서도 자연스럽다.
+ *
+ * `sun` · `moon` 은 헤더 메뉴의 밝기 선택에도 쓰이지만, 맥락과 자리가 멀어 같은
+ * 뜻으로 읽힐 여지가 없다.
+ *
+ * `label` 을 주는 이유: 알파벳은 스크린리더가 "A" 라고 읽었는데 아이콘은 아무것도
+ * 읽지 않는다. 표식을 그림으로 바꾸면서 그 정보를 잃지 않으려면 대체 텍스트가
+ * 필요하다 — 아이콘의 이름("해")이 아니라 **그것이 가리키는 것**("첫 번째 조합")을
+ * 적는다.
+ */
+const SET_MARKS = [
+  { icon: "sun", label: "첫 번째 조합" },
+  { icon: "moon", label: "두 번째 조합" },
+  // `star` 가 아니라 `star-filled` 다. 외곽선 별을 쓰면 채워진 해·달 옆에서 혼자
+  // 가벼워 보여 셋이 한 벌로 읽히지 않는다.
+  { icon: "star-filled", label: "세 번째 조합" },
+] as const;
 
 export interface LottoSectionProps {
   /** 세트 아래에 붙일 것 — 보통 사주로 가는 링크다. */
@@ -81,7 +105,7 @@ export function LottoSection({ action, level = 2 }: LottoSectionProps) {
   // 방문 시각을 시드에 섞는다 — 요청마다 다른 조합이 나온다(위 주석).
   const now = new Date();
   const sets = generateSets(latestDraw.round, String(now.getTime()), stats, {
-    count: SET_LABELS.length,
+    count: SET_MARKS.length,
   });
   const pickedAt = kstStamp(now);
 
@@ -121,15 +145,15 @@ export function LottoSection({ action, level = 2 }: LottoSectionProps) {
           <ul className="grid gap-3">
             {sets.map((numbers, index) => (
               <li
-                key={SET_LABELS[index]}
+                key={SET_MARKS[index].icon}
                 className="flex items-center gap-4 rounded-card-sm border border-hairline bg-surface-warm px-4 py-3.5 sm:gap-5 sm:px-5"
               >
-                <span
-                  aria-hidden
-                  className="font-mono-kr text-[12px] tracking-[0.1em] text-muted-3"
-                >
-                  {SET_LABELS[index]}
-                </span>
+                <Icon
+                  name={SET_MARKS[index].icon}
+                  label={SET_MARKS[index].label}
+                  size={20}
+                  className="flex-none text-gold-text"
+                />
                 <NumberBalls numbers={numbers} />
               </li>
             ))}

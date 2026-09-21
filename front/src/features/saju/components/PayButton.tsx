@@ -1,12 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ANONYMOUS, loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import { ApiError, bff } from "@/lib/http/browser";
 import { SAJU_EVENT, SAJU_PRODUCT_ID } from "@/shared/analytics/events";
 import type { BirthInput } from "../model/types";
 import { trackSaju } from "../model/analytics";
 import { secondsSince } from "../model/analytics-context";
+import { FREE_EVENT_PERIOD } from "../model/event";
 import { fromBirthInput } from "../services/wire";
 import { PillToggle } from "./PillToggle";
 
@@ -33,6 +35,13 @@ export interface PayButtonProps {
   birth: BirthInput;
   amount: number;
   orderName?: string;
+  /**
+   * 무료 기간인가. **서버 컴포넌트가 서버 시각으로 판정해 내려준다.**
+   *
+   * 이 값을 여기서 `isFreeEvent(new Date())` 로 직접 구하면 기기 시계를 옮기는
+   * 것만으로 결제를 건너뛸 수 있다. 판정을 서버에 두는 것이 이 prop 의 존재 이유다.
+   */
+  free?: boolean;
 }
 
 /** 토스가 아는 식별자다. 자유 문자열이 아니며, 틀리면 결제창에서야 드러난다. */
@@ -51,7 +60,15 @@ interface OrderCreated {
   amount: number;
 }
 
-export function PayButton({ birth, amount, orderName = "AI Of Tellers 정밀 사주 리포트" }: PayButtonProps) {
+export function PayButton({
+  birth,
+  amount,
+  orderName = "AI Of Tellers 정밀 사주 리포트",
+  // 기본값은 **유료**다. 값을 넘기지 않은 호출부가 실수로 결제를 건너뛰는 것보다,
+  // 이벤트 중에 결제창이 뜨는 쪽이 덜 나쁘다.
+  free = false,
+}: PayButtonProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 카드가 먼저다 — 대부분이 그것을 먼저 집는다. 계좌이체는 카드사 인증이
@@ -62,6 +79,24 @@ export function PayButton({ birth, amount, orderName = "AI Of Tellers 정밀 사
 
   async function handleClick() {
     setError(null);
+
+    // 무료 기간: 주문도 결제창도 만들지 않고 전체 풀이로 바로 보낸다.
+    // `/saju/report` 는 저장된 사주로 리포트를 만드는 화면이라 결제와 무관하게
+    // 이미 혼자 선다 — 결제 쪽을 우회하는 샛길을 새로 뚫을 필요가 없다.
+    if (free) {
+      trackSaju(SAJU_EVENT.purchaseClicked, {
+        // 0원으로 남긴다. 클릭은 실제로 일어났고, 이 기간의 결제 퍼널이 왜 비어
+        // 있는지를 나중에 설명해 주는 것이 이 값이다.
+        price_krw: 0,
+        payment_method: "free_event",
+        product_id: SAJU_PRODUCT_ID,
+        teaser_seconds: secondsSince("teaser_viewed"),
+        retry_index: attempts.current,
+      });
+      router.push("/saju/report");
+      return;
+    }
+
     setLoading(true);
 
     const retryIndex = attempts.current;
@@ -147,14 +182,18 @@ export function PayButton({ birth, amount, orderName = "AI Of Tellers 정밀 사
 
   return (
     <div>
-      <div className="mb-4">
-        <PillToggle
-          options={METHODS}
-          value={method}
-          onChange={setMethod}
-          groupLabel="결제 수단"
-        />
-      </div>
+      {/* 무료 기간에는 결제 수단을 묻지 않는다 — 고를 것이 없는 선택지를 남겨
+          두면 "그래서 얼마를 내라는 건가" 를 되묻게 만든다. */}
+      {!free && (
+        <div className="mb-4">
+          <PillToggle
+            options={METHODS}
+            value={method}
+            onChange={setMethod}
+            groupLabel="결제 수단"
+          />
+        </div>
+      )}
 
       <button
         type="button"
@@ -162,8 +201,18 @@ export function PayButton({ birth, amount, orderName = "AI Of Tellers 정밀 사
         disabled={loading}
         className="w-full rounded-pill bg-button-gradient px-6 py-3.5 text-[15px] font-bold text-on-primary shadow-cta transition-opacity disabled:opacity-60"
       >
-        {loading ? "결제창을 여는 중…" : `${amount.toLocaleString("ko-KR")}원 결제하고 보기`}
+        {free
+          ? "무료로 전체 풀이 보기"
+          : loading
+            ? "결제창을 여는 중…"
+            : `${amount.toLocaleString("ko-KR")}원 결제하고 보기`}
       </button>
+
+      {free && (
+        <p className="mt-3 text-center text-[12.5px] leading-relaxed text-muted-2">
+          추석 · 오픈 기념 무료 (행사기간 {FREE_EVENT_PERIOD})
+        </p>
+      )}
 
       {error && (
         <p

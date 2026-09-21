@@ -150,9 +150,20 @@ export interface TeaserViewProps {
   payment: PaymentConfig | null;
   /** 결제가 꺼져 있을 때의 무료 경로. */
   onOpenReport: () => void;
+  /** 이벤트 무료 기간인가. 서버 시각으로 판정된 값이 페이지에서 내려온다. */
+  freeEvent?: boolean;
 }
 
-export function TeaserView({ reading, birth, payment, onOpenReport }: TeaserViewProps) {
+export function TeaserView({
+  reading,
+  birth,
+  payment,
+  onOpenReport,
+  freeEvent = false,
+}: TeaserViewProps) {
+  // 가격에 줄을 긋고 보관 안내를 감추는 판단과, 결제를 건너뛰는 판단이 **같은 값**을
+  // 쓴다. 각자 시각을 재면 두 화면이 서로 다른 말을 할 수 있다.
+  const free = freeEvent;
   const { teaser } = reading;
 
   return (
@@ -233,13 +244,22 @@ export function TeaserView({ reading, birth, payment, onOpenReport }: TeaserView
                   ))}
                 </span>
               )}
-              {payment.price.toLocaleString("ko-KR")}원
+              {/* 무료 기간에는 값을 지우지 않고 **긋는다.** 원래 얼마인지가 보여야
+                  무료라는 말이 무게를 갖는다. 기간이 끝나면 줄이 저절로 사라진다. */}
+              <span className={free ? "text-muted-3 line-through decoration-from-font" : undefined}>
+                {payment.price.toLocaleString("ko-KR")}원
+              </span>
+              {free && <span className="text-gold-text-strong">무료</span>}
             </p>
-            <PayButton birth={birth} amount={payment.price} />
-            <p className="mt-4 text-[12px] leading-relaxed text-muted-2">
-              결제하시면 생년월일시와 리포트를 {payment.retention_days}일간 보관합니다 —
-              그 동안 링크로 다시 보실 수 있습니다.
-            </p>
+            <PayButton birth={birth} amount={payment.price} free={free} />
+            {/* 무료 경로는 결제도 보관도 하지 않는다(`/saju/report` 로 바로 간다).
+                이 안내를 그대로 두면 하지 않는 일을 하겠다고 말하는 셈이다. */}
+            {!free && (
+              <p className="mt-4 text-[12px] leading-relaxed text-muted-2">
+                결제하시면 생년월일시와 리포트를 {payment.retention_days}일간 보관합니다 —
+                그 동안 링크로 다시 보실 수 있습니다.
+              </p>
+            )}
           </>
         ) : (
           <button

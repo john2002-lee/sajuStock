@@ -27,7 +27,15 @@ import { StartOverPrompt, TeaserView } from "./TeaserView";
  * (그 뒤로는 `report_tier` 가 상속 컨텍스트로 따라다닌다). 화면이 최종 모습을
  * 갖춘 시점이 곧 사람이 "살지 말지" 를 보기 시작하는 시점이기도 하다.
  */
-export function TeaserScreen() {
+export interface TeaserScreenProps {
+  /**
+   * 이벤트 무료 기간인가. **페이지(서버 컴포넌트)가 서버 시각으로 판정해 넘긴다.**
+   * 이 화면에서 직접 시각을 재면 기기 시계를 옮기는 것만으로 결제를 건너뛸 수 있다.
+   */
+  freeEvent?: boolean;
+}
+
+export function TeaserScreen({ freeEvent = false }: TeaserScreenProps) {
   const router = useRouter();
   const stored = useStoredReading();
   const [payment, setPayment] = useState<PaymentConfig | null>(null);
@@ -79,6 +87,7 @@ export function TeaserScreen() {
       birth={stored.birth}
       payment={payment}
       onOpenReport={() => router.push("/saju/report")}
+      freeEvent={freeEvent}
     />
   );
 }

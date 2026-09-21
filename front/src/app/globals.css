@@ -756,7 +756,13 @@ textarea {
 
 /* 공유 이름의 값만 사주 값으로 바꾼다. 여기 있는 것이 곧 두 팔레트가 겹치는
    지점의 전부다 — 나머지는 이름이 서로 달라 부딪히지 않는다. */
-[data-service="saju"] {
+/* `[data-palette="flip"]` 은 **팔레트를 뒤집는 표식**이다 (`EventPopup`).
+   커스텀 속성은 상속되므로, 그 요소에 반대편 값을 선언해 두면 안쪽 전체가
+   따라온다 — 색을 손으로 고르지 않고 이미 검증된 두 팔레트를 그대로 쓴다.
+   여기(라이트 값)에는 **다크 화면 안의** flip 을 얹는다. 선택자가 둘
+   (0,2,0)이라 아래 다크 블록의 `[data-palette="flip"]`(0,1,0)을 이긴다. */
+[data-service="saju"],
+[data-theme="terminal"] [data-palette="flip"] {
   --paper: #fbf7ef;
   --surface: #ffffff;
   --surface-hover: #fffdf8;
@@ -816,7 +822,9 @@ textarea {
    가장 흐린 단계가 남색 배경 위에서 3.5:1 이라 라이트에서 고친 문제가 다크에서
    그대로 재현됐다. 색상은 유지하고 명도만 올렸다.
    ═══════════════════════════════════════════════════════════════════════════ */
-[data-theme="terminal"] [data-service="saju"] {
+/* 라이트 화면 안의 flip 이 여기(다크 값)로 온다. 위 라이트 블록의 짝이다. */
+[data-theme="terminal"] [data-service="saju"],
+[data-palette="flip"] {
   --paper: #0e1129;
   --surface: #1a1e3a;
   --surface-hover: #202449;

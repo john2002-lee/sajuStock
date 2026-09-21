@@ -117,7 +117,15 @@ export function EventPopup({ active }: EventPopupProps) {
       <div
         role="region"
         aria-labelledby={titleId}
-        className="pointer-events-auto w-full max-w-[26rem] overflow-hidden rounded-card border border-hairline bg-surface shadow-mockup"
+        // **팔레트를 뒤집는다** — 라이트 화면에서는 어두운 카드, 다크 화면에서는
+        // 밝은 카드. 딤도 백드롭도 없는 모데리스 안내라 지면과 같은 색이면
+        // 눈에 걸리지 않는다. 색을 새로 고르는 대신 이미 대비를 맞춰 둔 반대편
+        // 팔레트를 통째로 끌어온다 (`globals.css` 의 `[data-palette="flip"]`).
+        data-palette="flip"
+        // `text-ink` 는 장식이 아니라 **안전장치**다. 팔레트를 뒤집으면 배경은
+        // 따라오지만 상속 글자색은 바깥(원래 테마) 값 그대로라, 토큰 클래스 없이
+        // 글자를 하나 넣는 순간 어두운 바탕에 어두운 글자가 된다.
+        className="pointer-events-auto w-full max-w-[26rem] overflow-hidden rounded-card border border-hairline bg-surface text-ink shadow-mockup"
       >
         <div className="flex items-start justify-between gap-3 px-5 pt-5">
           <p className="font-mono-kr text-[10px] tracking-[0.22em] text-gold-text">EVENT</p>

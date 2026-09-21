@@ -102,6 +102,25 @@ export function ReportScreen() {
 
     return () => {
       controller.abort();
+      /**
+       * **취소한 요청은 시작한 적 없는 것으로 친다.**
+       *
+       * 이 한 줄이 없으면 개발 모드에서 리포트가 영영 안 나온다. StrictMode 는
+       * mount → cleanup → mount 를 도는데, `started` 는 ref 라 리마운트를 살아남고
+       * `controller` 는 버려진다. 그래서 1차 요청은 여기서 끊기고, 2차 mount 는
+       * 위 가드에 막혀 아무것도 보내지 않는다 — 실측: `POST /api/saju/report/jobs`
+       * 가 `net::ERR_ABORTED` 하나만 남고 백엔드 로그에는 요청 자체가 없으며,
+       * 화면은 "풀고 있네" 에서 영원히 멈춘다. 아래 `.catch` 가 취소를 조용히
+       * 삼키므로 오류조차 뜨지 않는다.
+       *
+       * 가드와 취소의 **수명이 달랐던 것**이 결함이다. 되돌려 맞춘다.
+       *
+       * 이렇게 해도 LLM 이 두 번 불릴 위험은 거의 없다 — 끊기는 시점이 StrictMode
+       * 의 동기 리마운트라 요청이 네트워크에 닿기 전이다(실측이 그것을 보여준다).
+       * 남는 위험은 "서버가 이미 접수한 뒤 끊긴" 경우뿐이고, 그것은 가드를 두지
+       * 않았을 때의 확실한 이중 호출보다 훨씬 작다.
+       */
+      started.current = false;
     };
   }, [stored]);
 

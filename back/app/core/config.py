@@ -253,6 +253,17 @@ class Settings(BaseSettings):
     # 들어와야 `integrations/amplitude` 가 클라이언트를 만든다.
     amplitude_ai_api_key: str | None = None
 
+    #: 이 프로세스가 어느 환경인가. Amplitude 이벤트에 그대로 실린다.
+    #:
+    #: **구분할 표식이 이것 하나뿐이다.** 백엔드 이벤트는 브라우저에서 나지 않아
+    #: `Page Domain` 같은 속성이 없고, 그래서 대시보드에서 운영과 로컬을 가를 수가
+    #: 없었다 — 개발자가 로컬에서 사주를 한 번 볼 때마다 실사용자 지표에 섞였다.
+    #:
+    #: 기본값이 `local` 인 것이 중요하다. 설정을 빠뜨렸을 때 로컬이 운영으로
+    #: 잘못 적히는 쪽이 반대보다 훨씬 나쁘다 — 그쪽은 지표를 오염시키고도
+    #: 아무 흔적을 남기지 않는다. 운영은 `deploy/env.yaml` 이 채운다.
+    amplitude_env: str = "local"
+
     # --- RAG (벡터 검색) ---
     # **대개 비워 둔다.** 주 DB 가 Postgres 라 그것을 그대로 벡터 저장소로 쓴다 —
     # 같은 Supabase 인스턴스가 앱 테이블과 pgvector 테이블을 함께 담는다.

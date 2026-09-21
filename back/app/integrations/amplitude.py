@@ -96,9 +96,16 @@ if ENABLED:
         config=AIConfig(content_mode="metadata_only"),
     )
 
+    # `env` 는 **운영과 로컬을 가르는 유일한 표식이다.** 백엔드 이벤트에는
+    # 브라우저 SDK 가 붙이는 `Page Domain` 이 없어, 이것이 없으면 개발자가
+    # 로컬에서 부른 LLM 호출이 실사용자 지표와 한 덩어리가 된다.
+    #
+    # 자식 에이전트(`child`)는 부모의 `env` 를 상속하므로 여기 둘에만 실으면
+    # 분석가 3인과 결정 에이전트까지 전부 따라온다 (SDK `BoundAgent.child`).
     STOCK_ADVICE = _ai_full.agent(
         "stock-advice",
         description="종목 하나에 대한 멀티 에이전트 투자 판단을 조율한다",
+        env=settings.amplitude_env,
     )
     # 이름은 `graph/nodes.py` 의 노드와 같다.
     STOCK_CHILDREN = {
@@ -114,6 +121,7 @@ if ENABLED:
     SAJU_REPORT = _ai_metadata_only.agent(
         "saju-report",
         description="사주 리포트를 생성한다 (본문 미수집 — 사주 원국은 생년월일시로 역산된다)",
+        env=settings.amplitude_env,
     )
 
     def _flush_impl() -> None:

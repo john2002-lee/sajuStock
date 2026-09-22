@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { EventPopup, SajuEntry, isFreeEvent } from "@/features/saju";
+import { NoticePopup, SajuEntry } from "@/features/saju";
+import { IS_TEST_PAYMENT } from "@/lib/config/payment-mode";
 import { getBirthPlaces } from "@/features/saju/server";
 import { LottoSection } from "@/features/lotto/server";
 import type { Metadata } from "next";
@@ -43,13 +44,12 @@ export default async function HomePage() {
   const places = await getBirthPlaces();
   return (
     <>
-      {/* 이벤트 안내.
-          기간 판정은 **여기서 서버 시각으로** 한다 — 화면이 스스로 `new Date()` 를
-          보면 기기 시계를 옮기는 것만으로 무료 안내가 뜬다. 결제 버튼도 같은 근거를
-          쓰므로(`/saju/teaser` 페이지) 두 화면이 서로 다른 말을 하지 않는다.
-          오늘 이미 닫았는지는 `localStorage` 에 있어 팝업이 스스로 본다.
-          이 라우트는 위에서 `revalidate = 0` 이라 판정이 캐시로 굳지 않는다. */}
-      <EventPopup active={isFreeEvent(new Date())} />
+      {/* 테스트 결제 안내. 뜰지 말지는 **토스 클라이언트 키 접두사**가 정한다
+          (`lib/config/payment-mode`) — 라이브 키로 다시 빌드하면 저절로 사라진다.
+          같은 문장이 결제 버튼 아래에도 있고 그쪽이 진짜 고지다. 이건 처음 온
+          사람에게 한 번 크게 알리는 쪽.
+          닫았는지는 `localStorage` 에 있어 팝업이 스스로 본다. */}
+      <NoticePopup active={IS_TEST_PAYMENT} />
       <SajuEntry places={places} />
       {/* 로또 조합은 **폼 다음** 이다. 이 화면에 온 사람이 하러 온 일은 사주
           입력이고, 로또는 그 일을 마치거나 내려보다가 만나면 된다. 앞에 두면

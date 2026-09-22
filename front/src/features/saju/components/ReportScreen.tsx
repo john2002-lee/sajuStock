@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { ApiError } from "@/lib/api";
 import { SAJU_EVENT } from "@/shared/analytics/events";
 import { identifyUser } from "@/shared/analytics/track";
 import { useStoredReading } from "../model/storage";
@@ -52,6 +54,8 @@ export function ReportScreen() {
    * 실행하는데, 그대로 두면 LLM 호출이 두 번 나간다 — 돈이 드는 유일한 경로에서
    * 개발 중에만 조용히 두 배가 된다.
    */
+  /** 결제해야 볼 수 있는 상태인가. 일반 실패와 그리는 것이 다르다. */
+  const [needsPurchase, setNeedsPurchase] = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
@@ -88,6 +92,16 @@ export function ReportScreen() {
         // 화면을 떠나서 끊은 것은 실패가 아니다. 여기서 상태를 건드리면 사라진
         // 컴포넌트에 `setState` 를 하게 된다.
         if (controller.signal.aborted) return;
+
+        // **기다린다고 열리지 않는다.** 백엔드가 유료 상품을 무료로 내주지 않게
+        // 되면서(`_deny_unpaid_full_reading`) 이 화면에 주소로 직접 들어온 사람은
+        // 402 를 받는다. 그것을 일반 실패로 그리면 "잠시 후 다시 시도" 라고
+        // 안내하게 되는데, 그 안내는 영원히 틀린다.
+        if (err instanceof ApiError && err.code === "saju_report_requires_payment") {
+          setNeedsPurchase(true);
+          return;
+        }
+
         trackSaju(SAJU_EVENT.reportFailed, {
           failure_stage: "job",
           // 기다리다 상한에 걸린 것과 서버가 실패를 돌려준 것은 원인이 다르다 —
@@ -126,6 +140,35 @@ export function ReportScreen() {
 
   if (stored === undefined) return null;
   if (stored === null) return <StartOverPrompt />;
+
+  if (needsPurchase) {
+    return (
+      <div className="mx-auto max-w-md">
+        <div className="rounded-card bg-surface p-6 text-center shadow-card sm:p-8">
+          <Shaman
+            expression="welcome"
+            className="mx-auto mb-4 w-[150px] rounded-[16px] shadow-card-sm"
+          />
+          <p className="font-mono-kr text-xs tracking-[0.12em] text-gold-text-strong">
+            FULL READING
+          </p>
+          <h2 className="mt-2 mb-3 font-display text-xl text-ink">
+            전체 풀이는 구매 후에 들려드리네
+          </h2>
+          <p className="text-sm leading-relaxed text-ink-body">
+            여덟 글자와 무료 요약은 그대로 보실 수 있네. 십신과 대운까지 풀어 주는
+            전체 리포트는 값을 치르셔야 하네.
+          </p>
+          <Link
+            href="/saju/teaser"
+            className="mt-5 block w-full rounded-pill bg-button-gradient px-6 py-3 text-[14px] font-bold text-on-primary shadow-cta"
+          >
+            명반으로 돌아가기
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (error !== null) {
     return (

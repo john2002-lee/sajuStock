@@ -204,16 +204,27 @@ export function PaidReportScreen({ token }: { token: string }) {
           />
           <h1 className="mb-3 font-display text-xl text-ink">리포트를 열지 못했네</h1>
           <p className="text-[14px] leading-relaxed text-ink-body">{error.message}</p>
-          {error.needsAttention && SUPPORT_EMAIL && (
+          {error.needsAttention && (
             <p className="mt-3 text-[13.5px] leading-relaxed text-ink-body">
               문의사항이 있으시면{" "}
-              <a
-                href={`mailto:${SUPPORT_EMAIL}`}
+              {SUPPORT_EMAIL ? (
+                <>
+                  <a
+                    href={`mailto:${SUPPORT_EMAIL}`}
+                    className="text-gold-text underline underline-offset-2 hover:text-gold-text-strong"
+                  >
+                    {SUPPORT_EMAIL}
+                  </a>
+                  로 연락해 주시거나{" "}
+                </>
+              ) : null}
+              <Link
+                href="/support"
                 className="text-gold-text underline underline-offset-2 hover:text-gold-text-strong"
               >
-                {SUPPORT_EMAIL}
-              </a>
-              로 언제든 연락해 주세요.
+                고객센터
+              </Link>
+              로 알려 주세요.
             </p>
           )}
           {error.retryable && !error.needsAttention && (

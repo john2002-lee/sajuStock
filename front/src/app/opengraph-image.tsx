@@ -97,8 +97,11 @@ export default async function Image() {
             <div style={{ display: "flex", fontSize: 92, lineHeight: 1.18, color: BODY }}>
               당신의 사주팔자,
             </div>
+            {/* 첫 화면 h1 과 **같은 문장이어야 한다**(`SajuEntry`). 공유 카드가
+                사이트와 다른 말을 하면, 링크를 눌러 들어온 사람이 다른 곳에
+                도착했다고 느낀다. */}
             <div style={{ display: "flex", fontSize: 92, lineHeight: 1.18, color: GOLD }}>
-              정확하게 읽습니다
+              시간부터 바로잡습니다
             </div>
           </div>
 

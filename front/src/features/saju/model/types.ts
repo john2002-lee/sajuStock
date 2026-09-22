@@ -195,3 +195,23 @@ export interface PaymentConfig {
   /** 결제한 주문의 보관 기간(일). 개인정보 문구가 같은 숫자를 말한다. */
   retention_days: number;
 }
+
+/**
+ * 결제 설정 조회의 세 가지 결말.
+ *
+ * ## 왜 `PaymentConfig | null` 로는 부족한가
+ *
+ * 예전에는 설정을 못 받으면 `null` 로 두고 **무료 경로를 그렸다.** 주석은 "팔 수
+ * 없는데 버튼을 보여 주는 것보다 낫다" 고 적고 있었는데, 그 판단이 뭉쳐 버린 것이
+ * 둘이다 — **서버가 "결제 꺼짐" 이라고 답한 것**과 **서버에 닿지 못한 것.**
+ *
+ * 앞은 서버가 실제로 알려 준 사실이라 무료로 여는 것이 맞다. 뒤는 아무것도 모르는
+ * 상태다. 그런데 뭉쳐 두면 개발자 도구로 이 요청 하나만 막아도 유료 리포트가
+ * 무료로 열린다 — 우연이 아니라 **누구나 재현할 수 있는 우회로**였다.
+ *
+ * 그래서 셋으로 가른다. 모를 때는 팔지도 주지도 않고 다시 시도하게 한다.
+ */
+export type PaymentState =
+  | { readonly status: "loading" }
+  | { readonly status: "ready"; readonly config: PaymentConfig }
+  | { readonly status: "unreachable" };

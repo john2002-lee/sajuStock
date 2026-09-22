@@ -56,7 +56,24 @@ function resolveSupportEmail(raw: string | undefined): string | undefined {
  * 그래서 여기에 두고, 백엔드와 어긋나지 않도록 **기본값을 같게** 맞춘다.
  * 백엔드에서 이 값을 바꾸면 `SAJU_RETENTION_DAYS` 도 함께 설정해야 한다.
  */
-export const RETENTION_DAYS = Number(process.env.NEXT_PUBLIC_SAJU_RETENTION_DAYS ?? 30);
+export const RETENTION_DAYS = Number(process.env.NEXT_PUBLIC_SAJU_RETENTION_DAYS ?? 7);
+
+/**
+ * **공개 화면에 적는** 리포트 가격(원).
+ *
+ * 가격의 진짜 출처는 백엔드다(`saju_report_price`). 결제 화면은 지금도 서버가 준
+ * 값으로 그리고, 주문 금액과 승인 검증도 서버가 정한다 — 돈이 걸리는 경로에
+ * 복사본을 두지 않는다는 규칙은 그대로다.
+ *
+ * 이 값은 **결제와 무관한 공개 소개 페이지**(`/saju/intro`)만 쓴다. 그 페이지는
+ * 사업자·가격 정보를 보러 오는 사람과 심사자가 처음 닿는 곳이라 백엔드가 죽어도
+ * 서야 한다. 조회를 붙이면 Cloud Run 이 콜드 스타트인 동안 상점이 오류 화면이
+ * 된다 — 약관·방침이 결제 API 에 기대지 않는 것과 같은 이유다(위 `RETENTION_DAYS`).
+ *
+ * 백엔드에 `saju_report_price == 1000` 을 못박는 테스트가 있어, 가격을 바꾸면
+ * 그 테스트가 깨지면서 이 값도 함께 고치라고 알려 준다.
+ */
+export const REPORT_PRICE = 1000;
 
 /**
  * Amplitude 수집 키. **브라우저에 나가는 것이 정상인 값이다** — 이벤트를 어느

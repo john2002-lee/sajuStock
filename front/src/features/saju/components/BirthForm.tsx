@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { RETENTION_DAYS } from "@/lib/config/public";
 import { useState, type FormEvent } from "react";
 import type { BirthPlace, Gender } from "../model/types";
 import { PillToggle } from "./PillToggle";
@@ -325,8 +327,23 @@ export function BirthForm({ places, pending, error, onSubmit }: BirthFormProps) 
       >
         {pending ? "사주를 펼치는 중…" : "무료로 사주팔자 보기"}
       </button>
-      <p className="mt-3 text-center text-[12px] text-muted-2">
-        회원가입 없이 바로 확인할 수 있어요
+      {/* **개인정보 수집 고지.** 생년월일시는 사람이 민감하게 느끼는 정보인데,
+          이 화면에는 무엇을 받아 어디에 쓰는지도, 방침으로 가는 길도 없었다.
+          있던 것은 두 필드의 용도 한 줄과, **데스크톱에서만 보이는**(`lg:block`)
+          "저장하지 않습니다" 칩뿐이었다 — 이 제품 이용자의 대부분이 모바일이다.
+
+          여기(제출 버튼 바로 아래)에 두는 이유는 누르기 직전이 읽는 자리이기
+          때문이다. 문단 하나로 짧게 두고 자세한 것은 방침으로 보낸다. */}
+      <p className="mt-3 text-[12px] leading-relaxed text-muted-2">
+        회원가입 없이 바로 확인하실 수 있습니다. 입력하신{" "}
+        <strong className="font-semibold">생년월일시·성별·출생지</strong>는 사주 계산에만
+        쓰이며, <strong className="font-semibold">무료로 보시는 동안에는 서버에 저장하지
+        않습니다.</strong> 리포트를 구매하시면 다시 보실 수 있도록 {RETENTION_DAYS}일간
+        보관한 뒤 파기합니다. 자세한 내용은{" "}
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-ink">
+          개인정보처리방침
+        </Link>
+        을 확인해 주세요.
       </p>
     </form>
   );

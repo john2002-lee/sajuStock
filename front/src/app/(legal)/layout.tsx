@@ -53,11 +53,14 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
           <Link href="/privacy" className="hover:text-ink">
             개인정보처리방침
           </Link>
+          <Link href="/refund" className="hover:text-ink">
+            환불정책
+          </Link>
+          <Link href="/support" className="hover:text-ink">
+            고객센터
+          </Link>
           <Link href="/saju/intro" className="hover:text-ink">
             서비스 소개
-          </Link>
-          <Link href="/" className="hover:text-ink">
-            서비스 선택
           </Link>
         </nav>
       </footer>

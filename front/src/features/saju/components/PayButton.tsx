@@ -1,14 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ANONYMOUS, loadTossPayments } from "@tosspayments/tosspayments-sdk";
 import { ApiError, bff } from "@/lib/http/browser";
 import { SAJU_EVENT, SAJU_PRODUCT_ID } from "@/shared/analytics/events";
 import type { BirthInput } from "../model/types";
 import { trackSaju } from "../model/analytics";
 import { secondsSince } from "../model/analytics-context";
-import { FREE_EVENT_PERIOD } from "../model/event";
+import { IS_TEST_PAYMENT, TEST_PAYMENT_NOTICE } from "@/lib/config/payment-mode";
+import { REPORT_PRODUCT_NAME } from "@/shared/legal/product";
 import { fromBirthInput } from "../services/wire";
 import { PillToggle } from "./PillToggle";
 
@@ -36,12 +36,10 @@ export interface PayButtonProps {
   amount: number;
   orderName?: string;
   /**
-   * 무료 기간인가. **서버 컴포넌트가 서버 시각으로 판정해 내려준다.**
-   *
-   * 이 값을 여기서 `isFreeEvent(new Date())` 로 직접 구하면 기기 시계를 옮기는
-   * 것만으로 결제를 건너뛸 수 있다. 판정을 서버에 두는 것이 이 prop 의 존재 이유다.
+   * 눌리지 않게 막는다. 지금 이걸 쓰는 곳은 청약철회 동의 전의 구매 카드다
+   * (`PurchaseCard`) — 동의를 받기 전에 결제창이 열리면 그 동의는 형식이 된다.
    */
-  free?: boolean;
+  disabled?: boolean;
 }
 
 /** 토스가 아는 식별자다. 자유 문자열이 아니며, 틀리면 결제창에서야 드러난다. */
@@ -63,12 +61,9 @@ interface OrderCreated {
 export function PayButton({
   birth,
   amount,
-  orderName = "AI Of Tellers 정밀 사주 리포트",
-  // 기본값은 **유료**다. 값을 넘기지 않은 호출부가 실수로 결제를 건너뛰는 것보다,
-  // 이벤트 중에 결제창이 뜨는 쪽이 덜 나쁘다.
-  free = false,
+  orderName = REPORT_PRODUCT_NAME,
+  disabled = false,
 }: PayButtonProps) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 카드가 먼저다 — 대부분이 그것을 먼저 집는다. 계좌이체는 카드사 인증이
@@ -79,23 +74,6 @@ export function PayButton({
 
   async function handleClick() {
     setError(null);
-
-    // 무료 기간: 주문도 결제창도 만들지 않고 전체 풀이로 바로 보낸다.
-    // `/saju/report` 는 저장된 사주로 리포트를 만드는 화면이라 결제와 무관하게
-    // 이미 혼자 선다 — 결제 쪽을 우회하는 샛길을 새로 뚫을 필요가 없다.
-    if (free) {
-      trackSaju(SAJU_EVENT.purchaseClicked, {
-        // 0원으로 남긴다. 클릭은 실제로 일어났고, 이 기간의 결제 퍼널이 왜 비어
-        // 있는지를 나중에 설명해 주는 것이 이 값이다.
-        price_krw: 0,
-        payment_method: "free_event",
-        product_id: SAJU_PRODUCT_ID,
-        teaser_seconds: secondsSince("teaser_viewed"),
-        retry_index: attempts.current,
-      });
-      router.push("/saju/report");
-      return;
-    }
 
     setLoading(true);
 
@@ -182,35 +160,34 @@ export function PayButton({
 
   return (
     <div>
-      {/* 무료 기간에는 결제 수단을 묻지 않는다 — 고를 것이 없는 선택지를 남겨
-          두면 "그래서 얼마를 내라는 건가" 를 되묻게 만든다. */}
-      {!free && (
-        <div className="mb-4">
-          <PillToggle
-            options={METHODS}
-            value={method}
-            onChange={setMethod}
-            groupLabel="결제 수단"
-          />
-        </div>
-      )}
+      <div className="mb-4">
+        <PillToggle
+          options={METHODS}
+          value={method}
+          onChange={setMethod}
+          groupLabel="결제 수단"
+        />
+      </div>
 
       <button
         type="button"
         onClick={handleClick}
-        disabled={loading}
+        disabled={loading || disabled}
         className="w-full rounded-pill bg-button-gradient px-6 py-3.5 text-[15px] font-bold text-on-primary shadow-cta transition-opacity disabled:opacity-60"
       >
-        {free
-          ? "무료로 전체 풀이 보기"
-          : loading
-            ? "결제창을 여는 중…"
-            : `${amount.toLocaleString("ko-KR")}원 결제하고 보기`}
+        {loading ? "결제창을 여는 중…" : `${amount.toLocaleString("ko-KR")}원 결제하고 보기`}
       </button>
 
-      {free && (
-        <p className="mt-3 text-center text-[12.5px] leading-relaxed text-muted-2">
-          추석 · 오픈 기념 무료 (행사기간 {FREE_EVENT_PERIOD})
+      {/* **진짜 고지는 여기다.** 돈이 걸리는 버튼 바로 아래이고 닫을 수 없다.
+          첫 화면의 팝업(`NoticePopup`)은 같은 문장을 한 번 크게 알릴 뿐이고,
+          그쪽은 닫히면 다시 뜨지 않는다.
+
+          조건은 토스 클라이언트 키 접두사다 — 라이브 키로 다시 빌드하면 이 줄이
+          저절로 사라진다. 손으로 내리는 플래그였다면 키만 바꾸고 문구를 남기는
+          배포가 언젠가 나온다(`lib/config/payment-mode` 머리말). */}
+      {IS_TEST_PAYMENT && (
+        <p className="mt-3 text-center text-[12.5px] font-semibold leading-relaxed text-gold-text-strong">
+          {TEST_PAYMENT_NOTICE}
         </p>
       )}
 

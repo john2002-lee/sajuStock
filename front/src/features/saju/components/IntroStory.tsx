@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { RETENTION_DAYS, REPORT_PRICE } from "@/lib/config/public";
+import { DELIVERY_NOTE, FREE_INCLUDES, PAID_INCLUDES, REPORT_PRODUCT_NAME } from "@/shared/legal/product";
 import { MeridianDiagram } from "./MeridianDiagram";
 import { Panel, PanelLabel, ShamanBeat } from "./Panel";
 import { Shaman } from "./Shaman";
@@ -15,19 +17,10 @@ import { Shaman } from "./Shaman";
  * 정적 콘텐츠라 서버에서 렌더된다 — `"use client"` 가 없다.
  */
 
-const FREE = [
-  "사주 여덟 글자 (4기둥)",
-  "오행이 몇 개씩인지",
-  "일간이 무엇인지",
-  "신강·신약 판정 결과",
-];
-const FULL = [
-  "그 판정이 왜 그렇게 나왔는지",
-  "십신으로 읽는 성격과 기질",
-  "십 년 단위 대운의 흐름",
-  "올해와 내년의 운",
-  "연애·관계, 재물·직업, 조언",
-];
+// 목록은 `model/product.ts` 가 한 벌만 들고 있다 — 구매 화면의 고지 표와 이
+// 페이지가 **같은 상품**을 설명해야 하기 때문이다.
+const FREE = FREE_INCLUDES;
+const FULL = PAID_INCLUDES;
 
 export function IntroStory() {
   return (
@@ -146,6 +139,47 @@ export function IntroStory() {
             </ul>
           </div>
         </div>
+
+
+        {/* **가격은 여기서 처음 보인다.**
+
+            결제 화면(`/saju/teaser`)은 생년월일을 넣어야 들어갈 수 있고 색인도 되지
+            않는다. 그래서 값이 얼마인지 보려면 반드시 사주를 입력해야 했다 — 사기
+            전에 가격을 확인하려는 사람도, 심사하는 사람도 닿을 수 없는 자리였다.
+            전자상거래법이 구매 **전에** 요구하는 것이 바로 이 정보다. */}
+        <div
+          id="가격"
+          className="mt-6 rounded-card-sm border border-hairline bg-surface px-5 py-4"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className="font-mono-kr text-[11px] tracking-[0.14em] text-gold-text-strong">
+              {REPORT_PRODUCT_NAME}
+            </p>
+            <p className="font-mono-kr text-[22px] font-semibold text-gold-text-strong">
+              {REPORT_PRICE.toLocaleString("ko-KR")}원
+            </p>
+          </div>
+          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13.5px] leading-relaxed">
+            <dt className="text-muted-2">제공 시점</dt>
+            <dd className="text-ink-body">{DELIVERY_NOTE}</dd>
+            <dt className="text-muted-2">보관 기간</dt>
+            <dd className="text-ink-body">
+              {RETENTION_DAYS}일 — 받으신 링크로 다시 보실 수 있네.
+            </dd>
+            <dt className="text-muted-2">환불</dt>
+            <dd className="text-ink-body">
+              풀이가 다 만들어진 뒤에는 무르기 어렵네.{" "}
+              <Link href="/refund" className="text-gold-text-strong underline underline-offset-2">
+                환불정책
+              </Link>
+              을 먼저 읽어 보시게.
+            </dd>
+          </dl>
+          <p className="mt-3 text-[12.5px] leading-relaxed text-muted-2">
+            값은 여덟 글자를 먼저 본 다음 정하셔도 되네. 결제 화면에서 구성과 환불
+            조건을 한 번 더 보여 드리네.
+          </p>
+        </div>
       </Panel>
 
       <Panel className="text-center">
@@ -169,7 +203,7 @@ export function IntroStory() {
         <ul className="flex flex-col gap-2 text-[14px] leading-relaxed text-muted">
           <li>
             · 회원가입을 받지 않네. 여덟 글자만 볼 때는 생년월일시를 서버에 남기지 않고,
-            풀이를 사시면 다시 보실 수 있게 30일 두었다 지우네.
+            풀이를 사시면 다시 보실 수 있게 {RETENTION_DAYS}일 두었다 지우네.
           </li>
           <li>
             · 밤 11시부터는 다음 날로 세는 정자시설을 따르네. 강약은 이 집이 만든

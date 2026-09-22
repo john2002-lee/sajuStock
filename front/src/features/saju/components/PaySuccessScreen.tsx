@@ -172,17 +172,33 @@ export function PaySuccessScreen() {
           <p className="text-[14px] leading-relaxed text-ink-body">{shown.message}</p>
 
           {/* 연락할 곳. `needsAttention` 일 때만 준다 — 그때가 사람의 손이 필요한
-              유일한 경우이고, 나머지(카드 거절 등)는 다시 시도하면 된다. */}
-          {shown.needsAttention && SUPPORT_EMAIL && (
+              유일한 경우이고, 나머지(카드 거절 등)는 다시 시도하면 된다.
+
+              **이메일 설정 여부와 무관하게 갈 곳을 준다.** 예전에는 조건이
+              `&& SUPPORT_EMAIL` 이라, 메일 주소가 비어 있는 동안 전액 환불을
+              약속받은 사람에게 연락할 방법이 한 줄도 없었다. 고객센터 페이지는
+              환경변수와 무관하게 존재하므로 링크는 언제나 성립한다. */}
+          {shown.needsAttention && (
             <p className="mt-3 text-[13.5px] leading-relaxed text-ink-body">
               문의사항이 있으시면{" "}
-              <a
-                href={`mailto:${SUPPORT_EMAIL}`}
+              {SUPPORT_EMAIL ? (
+                <>
+                  <a
+                    href={`mailto:${SUPPORT_EMAIL}`}
+                    className="text-gold-text underline underline-offset-2 hover:text-gold-text-strong"
+                  >
+                    {SUPPORT_EMAIL}
+                  </a>
+                  로 연락해 주시거나{" "}
+                </>
+              ) : null}
+              <Link
+                href="/support"
                 className="text-gold-text underline underline-offset-2 hover:text-gold-text-strong"
               >
-                {SUPPORT_EMAIL}
-              </a>
-              로 언제든 연락해 주세요.
+                고객센터
+              </Link>
+              로 알려 주세요.
             </p>
           )}
 

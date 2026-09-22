@@ -6,8 +6,8 @@ import { WUXING_KEYS } from "../model/types";
 import { WUXING_LABEL, ganWuxingOf, wuxingClass, zhiWuxingOf } from "../model/wuxing";
 import { ConventionNotice } from "./ConventionNotice";
 import { ShareButton } from "./ShareButton";
-import { PayButton } from "./PayButton";
-import type { PaymentConfig } from "../model/types";
+import { PurchaseCard } from "./PurchaseCard";
+import type { PaymentState } from "../model/types";
 
 /**
  * 티저 화면 본문: 4기둥 그리드(일주 열만 "일간" 배지 + 금빛 강조), 무료 요약,
@@ -111,47 +111,16 @@ export function StartOverPrompt() {
   );
 }
 
-/**
- * "천원의 행복" 다섯 글자에 무지개 다섯 색. 글자 수와 색 수가 정확히 맞는다.
- *
- * ## 왜 어두운 배지인가
- *
- * 처음에는 흰 배지에 선명한 무지개를 올렸는데 **10px 글자가 읽히지 않았다** —
- * 흰 바탕에서 주황 2.99:1 · 노랑 2.42:1 · 초록 3.40:1 로, AA(4.5:1) 한참 아래다.
- * 읽히게 만들려면 색을 깊게 내려야 하고, 그러면 무지개가 흙색이 된다.
- *
- * 그래서 바탕을 뒤집었다. 어두운 바탕에서는 순색에 가까운 밝은 색을 쓸 수 있어
- * **선명함과 가독성을 동시에** 얻는다 (최저 5.69:1). 배지 하나만 어두운 것이
- * 크림 지면에서 오히려 눈에 걸리는데, 장식 배지에는 그게 이점이다.
- *
- * 바탕색은 검정이 아니라 따뜻한 갈흑(`#2A2118`)이다 — 금빛 지면에 검정을 놓으면
- * 이 화면에서 유일하게 차가운 면이 된다.
- *
- * ## 왜 토큰이 아니라 리터럴인가
- *
- * 무지개는 이 배지 하나에만 쓴다. 토큰으로 올리면 팔레트에 재사용될 것처럼 보이고,
- * 오행색(`--wuxing-*`)과 섞이면 더 나쁘다 — 그쪽은 의미가 있는 색이고 이것은 장식이다.
- */
-const HAPPINESS_PILL_BG = "#2A2118";
-const HAPPINESS_LETTERS: readonly (readonly [string, string])[] = [
-  ["천", "#FF6B6B"], // 빨
-  ["원", "#FFA94D"], // 주
-  // 낱자로 쪼개면 JSX 사이의 공백이 사라지므로 어절 공백을 글자에 붙여 둔다.
-  ["의 ", "#FFD43B"], // 노
-  ["행", "#51CF66"], // 초
-  ["복", "#4DABF7"], // 파
-];
-
 export interface TeaserViewProps {
   reading: SajuReading;
   /** 결제 요청에 다시 실어야 하는 원본 입력. */
   birth: BirthInput;
-  /** 서버가 준 결제 설정. `null` 이면 아직 못 받았다 — 그때는 무료 버튼을 그린다. */
-  payment: PaymentConfig | null;
-  /** 결제가 꺼져 있을 때의 무료 경로. */
+  /** 결제 설정 조회의 결말. 셋을 가르는 이유는 `model/types.ts` 에 있다. */
+  payment: PaymentState;
+  /** 서버가 "팔 수 없다" 고 답했을 때의 무료 경로. */
   onOpenReport: () => void;
-  /** 이벤트 무료 기간인가. 서버 시각으로 판정된 값이 페이지에서 내려온다. */
-  freeEvent?: boolean;
+  /** 결제 설정을 다시 물어본다. */
+  onRetryPayment: () => void;
 }
 
 export function TeaserView({
@@ -159,11 +128,8 @@ export function TeaserView({
   birth,
   payment,
   onOpenReport,
-  freeEvent = false,
+  onRetryPayment,
 }: TeaserViewProps) {
-  // 가격에 줄을 긋고 보관 안내를 감추는 판단과, 결제를 건너뛰는 판단이 **같은 값**을
-  // 쓴다. 각자 시각을 재면 두 화면이 서로 다른 말을 할 수 있다.
-  const free = freeEvent;
   const { teaser } = reading;
 
   return (
@@ -212,65 +178,12 @@ export function TeaserView({
         “명리는 정답을 정해주지 않습니다. 다만, 나를 이해하는 하나의 언어일 뿐입니다.”
       </p>
 
-      <div className="bg-surface-raise rounded-card p-6 text-center shadow-mockup sm:p-8">
-        <p className="mb-2 font-mono-kr text-[11px] tracking-[0.2em] text-gold-text-strong">
-          {payment?.enabled ? "PREMIUM ANALYSIS" : "FULL READING"}
-        </p>
-        <h2 className="mb-3 font-display text-xl text-ink">전체 리포트 보기</h2>
-        <p className="mb-6 text-[13.5px] leading-relaxed text-ink-body">
-          여덟 글자가 왜 그렇게 읽히는지, 십신과 대운의 흐름까지 무당이 직접 풀어 줍니다.
-        </p>
-
-        {/* 결제 설정이 없으면(키 미설정) **결제 UI 를 그리지 않는다.** 팔 수 없는
-            상태에서 버튼을 보여 주면 눌러 본 사람이 결제창에서 실패한다.
-            서버가 `enabled: false` 로 답하는 그 경우, 리포트는 무료로 바로 연다. */}
-        {payment?.enabled ? (
-          <>
-            {/* 가격 옆의 "천원의 행복" 은 **가격이 실제로 1,000원일 때만** 붙는다.
-                가격의 원본은 서버 한 곳(`config.saju_report_price`)이고 화면은 그것을
-                받아 그린다. 문구를 무조건 그리면 가격을 올린 다음 회차에 화면이
-                거짓을 말한다 — 문의처가 비었을 때 연락처 줄을 빼는 것과 같은 규칙이다
-                (`shared/legal/business.ts` 의 임시값 고지와 같은 이유). */}
-            <p className="mb-5 flex items-center justify-center gap-2 font-mono-kr text-2xl font-semibold text-gold-text-strong">
-              {payment.price === 1000 && (
-                <span
-                  className="rounded-pill px-2.5 py-1 font-sans-kr text-[10px] font-bold tracking-wide"
-                  style={{ backgroundColor: HAPPINESS_PILL_BG }}
-                >
-                  {HAPPINESS_LETTERS.map(([letter, color]) => (
-                    <span key={letter} style={{ color }}>
-                      {letter}
-                    </span>
-                  ))}
-                </span>
-              )}
-              {/* 무료 기간에는 값을 지우지 않고 **긋는다.** 원래 얼마인지가 보여야
-                  무료라는 말이 무게를 갖는다. 기간이 끝나면 줄이 저절로 사라진다. */}
-              <span className={free ? "text-muted-3 line-through decoration-from-font" : undefined}>
-                {payment.price.toLocaleString("ko-KR")}원
-              </span>
-              {free && <span className="text-gold-text-strong">무료</span>}
-            </p>
-            <PayButton birth={birth} amount={payment.price} free={free} />
-            {/* 무료 경로는 결제도 보관도 하지 않는다(`/saju/report` 로 바로 간다).
-                이 안내를 그대로 두면 하지 않는 일을 하겠다고 말하는 셈이다. */}
-            {!free && (
-              <p className="mt-4 text-[12px] leading-relaxed text-muted-2">
-                결제하시면 생년월일시와 리포트를 {payment.retention_days}일간 보관합니다 —
-                그 동안 링크로 다시 보실 수 있습니다.
-              </p>
-            )}
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={onOpenReport}
-            className="rounded-pill bg-button-gradient px-8 py-3.5 text-[15px] font-bold text-on-primary shadow-cta"
-          >
-            리포트 받아보기
-          </button>
-        )}
-      </div>
+      <PurchaseCard
+        birth={birth}
+        payment={payment}
+        onOpenReport={onOpenReport}
+        onRetryPayment={onRetryPayment}
+      />
 
       {/* 공유는 **관례 고지 앞**이다. 고지 뒤로 내리면 읽기가 끝난 자리가 아니라
           잔글씨 뒤가 되어 눈에 들어오지 않는다. 리포트 카드 바로 다음이 이 화면에서

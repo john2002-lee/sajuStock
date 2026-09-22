@@ -16,7 +16,7 @@ export { SajuEntry } from "./components/SajuEntry";
 export { TeaserScreen } from "./components/TeaserScreen";
 export { ReportScreen } from "./components/ReportScreen";
 export { IntroStory } from "./components/IntroStory";
-export { EventPopup } from "./components/EventPopup";
+export { NoticePopup } from "./components/NoticePopup";
 export { PaySuccessScreen } from "./components/PaySuccessScreen";
 export { PayFailNotice } from "./components/PayFailNotice";
 export { PaidReportScreen } from "./components/PaidReportScreen";
@@ -40,7 +40,6 @@ export { WUXING_KEYS } from "./model/types";
 export { WUXING_LABEL, ganWuxingOf, wuxingClass, zhiWuxingOf } from "./model/wuxing";
 export { splitSections, extractPreamble, type DisplaySection } from "./model/sections";
 export { toBeats, cueFor, type Beat } from "./model/beats";
-export { FREE_EVENT_PERIOD, isFreeEvent } from "./model/event";
 export {
   loadReading,
   saveReading,

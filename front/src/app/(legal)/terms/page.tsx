@@ -1,8 +1,14 @@
-import { Fragment } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { IS_PLACEHOLDER, PLACEHOLDER_NOTICE, businessRows } from "@/shared/legal/business";
-import { SUPPORT_EMAIL } from "@/lib/config/public";
+import { REPORT_PRICE, RETENTION_DAYS, SUPPORT_EMAIL } from "@/lib/config/public";
+import { REFUND_ON_FAILURE } from "@/shared/legal/refund";
+import {
+  DELIVERY_NOTE,
+  PAID_INCLUDES,
+  REPORT_PRODUCT_NAME,
+} from "@/shared/legal/product";
+import { BusinessInfoTable } from "../_components/BusinessInfoTable";
+import { DocHeading, Section } from "../_components/Section";
 
 /**
  * 이용약관.
@@ -30,65 +36,97 @@ export const metadata: Metadata = {
   description: "AI Of Tellers 서비스 이용약관 · 환불 정책 · 사업자 정보",
 };
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mb-8">
-      <h2 className="mb-3 font-display text-[17px] text-ink">{title}</h2>
-      <div className="space-y-2.5 text-[15px] leading-[1.75] text-muted-75">{children}</div>
-    </section>
-  );
-}
-
 export default function TermsOfServicePage() {
   return (
     <>
-      <h1 className="mb-2 font-display text-[26px] font-normal leading-tight text-ink">
-        이용약관
-      </h1>
-      <p className="mb-10 text-12 text-muted-60">시행일: 2026년 8월 25일</p>
+      <DocHeading title="이용약관" effectiveOn="2026년 9월 21일" />
 
       <Section title="제1조 (목적)">
         <p>
-          이 약관은 AI Of Tellers(이하 &ldquo;서비스&rdquo;)이 제공하는 주식 정보 서비스와
-          사주팔자 계산·리포트 서비스의 이용과 관련하여 서비스와 이용자 간의 권리·의무
-          및 책임사항을 정함을 목적으로 합니다.
+          이 약관은 AI Of Tellers(이하 &ldquo;서비스&rdquo;)가 제공하는 사주팔자 계산 및
+          리포트 서비스의 이용과 관련하여 서비스와 이용자 간의 권리·의무 및 책임사항을
+          정함을 목적으로 합니다.
         </p>
       </Section>
 
       <Section title="제2조 (서비스의 구성)">
-        <p>서비스는 두 개의 서비스로 구성됩니다.</p>
+        <p>
+          서비스는 이용자가 입력한 생년월일시·성별·출생지를 바탕으로 진태양시 보정을
+          적용해 사주팔자를 계산하고, 그 해석을 제공합니다.
+        </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            <strong className="font-semibold text-ink">주식</strong> — 시장 지수·종목
-            시세·재무·뉴스·애널리스트 리포트의 조회, 관심종목 관리, AI 판단 요약을
-            제공합니다.
+            <strong className="font-semibold text-ink">무료</strong> — 사주 여덟 글자,
+            오행 분포, 일간, 신강·신약 판정과 요약.
           </li>
           <li>
-            <strong className="font-semibold text-ink">사주</strong> — 이용자가 입력한
-            생년월일시·성별·출생지를 바탕으로 진태양시 보정을 적용해 사주팔자를 계산하고,
-            무료 요약과 유료 상세 리포트를 제공합니다.
+            <strong className="font-semibold text-ink">유료</strong> — 정밀 사주 리포트.
+            판정의 근거, 십신 해석, 대운과 세운의 흐름, 연애·재물·직업에 관한 해설을
+            제공합니다. 자세한 거래조건은 아래와 같습니다.
           </li>
         </ul>
+
+        {/* 결제 화면에 6줄짜리 표로 있던 것을 이리로 옮겼다. 사는 순간 읽어야 하는
+            것(가격·제공 시점·청약철회 제한)은 결제 화면에 요약으로 남기고, 전문은
+            약관인 여기에 둔다 — 화면은 사는 자리이지 읽는 자리가 아니다.
+
+            값은 화면과 **같은 출처**에서 온다. 상품명·구성·제공 시점은
+            `shared/legal/product`, 가격과 보관 기간은 `lib/config/public` 이고,
+            결제 화면도 같은 것을 쓴다. 약관에 숫자를 손으로 적어 두면 가격을 바꾼
+            날 약관만 조용히 뒤처진다. */}
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-card-sm border border-line-20 px-4 py-4 text-[14.5px] leading-[1.7]">
+          <dt className="text-muted-60">상품명</dt>
+          <dd className="text-muted-75">{REPORT_PRODUCT_NAME}</dd>
+
+          <dt className="text-muted-60">구성</dt>
+          <dd className="text-muted-75">{PAID_INCLUDES.join(" · ")}</dd>
+
+          <dt className="text-muted-60">가격</dt>
+          <dd className="text-muted-75">
+            {REPORT_PRICE.toLocaleString("ko-KR")}원 (부가세 포함)
+          </dd>
+
+          <dt className="text-muted-60">제공 시점</dt>
+          <dd className="text-muted-75">{DELIVERY_NOTE}</dd>
+
+          <dt className="text-muted-60">제공 방법</dt>
+          <dd className="text-muted-75">
+            결제 완료 후 발급되는 리포트 주소로 즉시 열람하실 수 있습니다. 별도의 설치나
+            배송은 없습니다.
+          </dd>
+
+          <dt className="text-muted-60">보관 기간</dt>
+          <dd className="text-muted-75">
+            {RETENTION_DAYS}일. 그 동안 받으신 주소로 다시 보실 수 있으며, 기간이 지나면
+            리포트와 입력하신 정보를 함께 파기합니다.
+          </dd>
+
+          <dt className="text-muted-60">청약철회</dt>
+          <dd className="text-muted-75">
+            리포트 생성이 시작되면 청약철회가 제한됩니다. 아래 제6조와{" "}
+            <Link href="/refund" className="text-ink underline underline-offset-2">
+              환불정책
+            </Link>
+            을 확인해 주세요.
+          </dd>
+        </dl>
+
         <p>
-          두 서비스는 각자 답합니다. 사주로 읽은 성향을 종목 판단에 결합하는 기능은
-          준비 중이며, 도입되더라도 성향은 판단을 보수적인 쪽으로만 움직이고 없던 매수
-          판단을 만들어내지 않습니다.
+          서비스가 제공하는 것은{" "}
+          <strong className="font-semibold text-ink">참고용 콘텐츠</strong>이며, 특정 결과나
+          이익을 보장하지 않습니다.
         </p>
       </Section>
 
-      <Section title="제3조 (회원)">
+      <Section title="제3조 (계정)">
         <p>
-          이용자는 이메일 주소와 비밀번호로 회원으로 가입할 수 있습니다. 회원 가입은
-          관심종목을 여러 기기에서 이어 보기 위한 것이며,{" "}
-          <strong className="font-semibold text-ink">
-            사주 서비스는 회원 가입 없이 이용합니다
-          </strong>{" "}
-          — 무료 계산과 유료 리포트 구매 모두 계정을 요구하지 않습니다.
+          <strong className="font-semibold text-ink">이 서비스에는 회원가입이 없습니다.</strong>{" "}
+          무료 계산과 유료 리포트 구매 모두 계정을 요구하지 않으며, 이름·이메일·연락처를
+          받지 않습니다.
         </p>
         <p>
-          회원은 아래 제10조의 문의처로 탈퇴를 요청할 수 있으며, 서비스는 요청을 받으면
-          지체 없이 회원 정보를 파기합니다. 회원이 약관을 위반하거나 타인의 정보를
-          도용한 경우 서비스는 해당 회원 정보를 삭제할 수 있습니다.
+          서비스 운영에 필요한 관리자 계정이 별도로 존재하나 이는 운영자 전용이며
+          이용자에게 제공되지 않습니다.
         </p>
       </Section>
 
@@ -123,7 +161,7 @@ export default function TermsOfServicePage() {
           경우, 서비스는 해당 주문을 담당자 확인이 필요한 상태로 표시하고 사람이 직접
           확인합니다.{" "}
           <strong className="font-semibold text-ink">
-            이 경우 영업일 기준 1일 이내로 결제하신 금액을 전액 환불해 드립니다.
+            이 경우 {REFUND_ON_FAILURE}
           </strong>{" "}
           이 환불 처리는 자동으로 이루어지지 않으며, 담당자가 결제대행사(토스페이먼츠)
           대시보드를 통해 직접 처리합니다.
@@ -131,6 +169,13 @@ export default function TermsOfServicePage() {
         <p>
           결제는 완료되었으나 리포트가 정상적으로 도착하지 않는 등 위와 같은 문제를 겪은
           경우, 아래 제10조의 문의처로 연락해 주시면 확인 후 처리해 드립니다.
+        </p>
+        <p>
+          상황별 환불 기준과 접수 방법은{" "}
+          <Link href="/refund" className="text-ink underline underline-offset-2">
+            환불정책
+          </Link>
+          에 자세히 적어 두었습니다.
         </p>
       </Section>
 
@@ -188,15 +233,7 @@ export default function TermsOfServicePage() {
             합니다.
           </p>
         )}
-        {IS_PLACEHOLDER && <p className="text-down">{PLACEHOLDER_NOTICE}</p>}
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 pt-1">
-          {businessRows().map(([label, value]) => (
-            <Fragment key={label}>
-              <dt className="text-muted-60">{label}</dt>
-              <dd className="text-muted-75">{value}</dd>
-            </Fragment>
-          ))}
-        </dl>
+          <BusinessInfoTable />
       </Section>
     </>
   );

@@ -96,6 +96,7 @@ const BATCH_LABELS: Record<string, string> = {
   snapshot: "일정 · 지표 스냅샷",
   market_cap: "시가총액",
   movers: "등락률 스캔",
+  saju_purge: "사주 주문 파기",
 };
 
 export function batchLabel(name: string): string {

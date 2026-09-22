@@ -2,33 +2,42 @@
 
 import { useId, useState, useSyncExternalStore } from "react";
 import { Icon } from "@/shared/ui";
-import { FREE_EVENT_PERIOD } from "../model/event";
+import { TEST_PAYMENT_NOTICE } from "@/lib/config/payment-mode";
 import { Shaman } from "./Shaman";
 
 /**
- * 추석 · 오픈 기념 이벤트 안내 팝업.
+ * 첫 화면 오른쪽 아래에 뜨는 안내 팝업.
  *
- * ## 기간 판정은 서버가, 닫았는지는 브라우저가
+ * ## 무엇을 알리나 — 지금은 "결제가 테스트다"
  *
- * `active` 는 **서버 컴포넌트가 서버 시각으로 판정한 값** 이다. 여기서
- * `isFreeEvent(new Date())` 를 부르지 않는 이유는, 그러면 기기 시계를 옮기는 것만으로
- * 기간 밖에서도 무료 안내가 뜨기 때문이다 — 결제 버튼과 같은 근거를 써야 화면이
- * 서로 다른 말을 하지 않는다.
+ * 전에는 추석·오픈 기념 **무료 행사**를 알렸고, 그 행사는 2026-09-20 에 닫혔다.
+ * 지금 알리는 것은 결제가 테스트 키로 돈다는 사실이다 — 결제창은 진짜로 열리지만
+ * 실제 카드가 긁히지 않는다.
  *
- * 오늘 이미 닫았는지는 `localStorage` 에 있어 서버가 알 수 없다. 그 한 조각만
- * `useSyncExternalStore` 로 읽는다 — **서버 스냅샷은 언제나 `false`**(= 닫은 적 없음이
- * 아니라 "아직 모른다")이고 브라우저에서만 참이 된다. `useEffect` 에서 `setState` 로
- * 켜는 방법도 있지만 렌더를 한 번 더 돌리는 일이라 이 저장소의 lint 가 막는다
+ * 이 사실은 **손으로 켜지 않는다.** `active` 로 받는 값의 출처는
+ * `lib/config/payment-mode` 의 `IS_TEST_PAYMENT` 이고, 그것은 토스 클라이언트 키
+ * 접두사에서 나온다. 라이브 키를 넣고 다시 빌드하면 이 팝업은 저절로 사라진다.
+ *
+ * ## 이것이 유일한 고지는 아니다
+ *
+ * 같은 문장이 결제 버튼 바로 아래에도 있다(`PayButton`). 그쪽이 **진짜 고지**다 —
+ * 돈이 걸리는 순간에 눈앞에 있고, 닫을 수 없다. 이 팝업은 처음 온 사람에게
+ * 한 번 크게 알리는 역할이다.
+ *
+ * 그래서 닫으면 **다시 뜨지 않는다.** 행사 안내였을 때는 기간이 2주라 하루 단위로
+ * 다시 띄웠지만, 이 고지는 기약이 없다. 매일 같은 팝업을 다시 던지면 사주를 보러
+ * 온 사람이 팝업을 닫으러 오게 된다. 잊어버릴 위험은 결제 버튼 쪽 문장이 받는다.
+ *
+ * ## 닫았는지는 브라우저만 안다
+ *
+ * `localStorage` 에 있어 서버가 알 수 없다. 그 한 조각만 `useSyncExternalStore` 로
+ * 읽는다 — **서버 스냅샷은 언제나 `false`**(= 닫은 적 없음이 아니라 "아직 모른다")
+ * 이고 브라우저에서만 참이 된다. `useEffect` 에서 `setState` 로 켜는 방법도 있지만
+ * 렌더를 한 번 더 돌리는 일이라 이 저장소의 lint 가 막는다
  * (`react-hooks/set-state-in-effect`).
  *
- * ## 닫으면 그날은 다시 뜨지 않는다
- *
- * 이벤트 기간이 2주 남짓인데 방문할 때마다 같은 팝업을 다시 던지면, 그 사람이
- * 사주를 보러 온 것인지 팝업을 닫으러 온 것인지 모르게 된다. 날짜 한 줄만
- * 저장한다 — 사주 입력값은 여전히 아무 데도 저장하지 않는다.
- *
  * 저장소는 실패할 수 있다(사파리 프라이빗, 차단된 사이트 데이터). 읽기·쓰기를
- * 각각 감싸고, 실패하면 "오늘 닫은 적 없음" 으로 떨어진다 — 팝업이 한 번 더 뜨는
+ * 각각 감싸고, 실패하면 "닫은 적 없음" 으로 떨어진다 — 팝업이 한 번 더 뜨는
  * 것이 화면이 깨지는 것보다 낫다.
  *
  * ## **모달이 아니다**
@@ -47,25 +56,24 @@ import { Shaman } from "./Shaman";
  * 말하면 스크린리더 사용자가 받는 예고와 실제가 어긋난다.
  */
 
-const DISMISS_KEY = "aiot:event-popup-dismissed";
+/**
+ * 행사 팝업이 쓰던 키(`aiot:event-popup-dismissed`)를 **재사용하지 않는다.**
+ * 그 키에는 행사 안내를 닫은 날짜가 들어 있어서, 그대로 쓰면 어제 행사 팝업을
+ * 닫은 사람이 오늘 결제 고지를 못 본다. 뜻이 달라졌으면 키도 달라야 한다.
+ */
+const DISMISS_KEY = "aiot:test-payment-notice-dismissed";
 
-/** `YYYY-MM-DD` (KST). 날짜만 비교하므로 시간대는 한 번만 맞추면 된다. */
-function kstToday(now: Date): string {
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 10);
-}
-
-function dismissedToday(today: string): boolean {
+function dismissed(): boolean {
   try {
-    return window.localStorage.getItem(DISMISS_KEY) === today;
+    return window.localStorage.getItem(DISMISS_KEY) !== null;
   } catch {
     return false;
   }
 }
 
-function rememberDismissal(today: string): void {
+function rememberDismissal(): void {
   try {
-    window.localStorage.setItem(DISMISS_KEY, today);
+    window.localStorage.setItem(DISMISS_KEY, "1");
   } catch {
     // 저장하지 못하면 다음 방문에 한 번 더 뜬다. 그뿐이다.
   }
@@ -74,17 +82,23 @@ function rememberDismissal(today: string): void {
 /** 구독할 바깥 변화가 없다 — 한 번 정해지면 사용자가 닫기 전까지 그대로다. */
 const NO_SUBSCRIBE = () => () => {};
 
-/** 오늘 닫은 적이 없는가. 브라우저에서만 참이 될 수 있다(서버는 저장소를 못 읽는다). */
+/** 아직 닫은 적이 없는가. 브라우저에서만 참이 될 수 있다(서버는 저장소를 못 읽는다). */
 function notDismissedYet(): boolean {
-  return !dismissedToday(kstToday(new Date()));
+  return !dismissed();
 }
 
-export interface EventPopupProps {
-  /** 서버 시각으로 판정한 이벤트 활성 여부. 브라우저 시계를 믿지 않는다. */
+export interface NoticePopupProps {
+  /**
+   * 고지를 띄울 상황인가. 지금 넘어오는 값은 `IS_TEST_PAYMENT` 다.
+   *
+   * 값이 빌드 시점에 정해지더라도 prop 으로 받는 모양은 남겨 둔다 — 이 컴포넌트가
+   * "무엇을 근거로 뜨는지" 를 부르는 쪽이 정하게 하는 편이, 다음 고지가 생겼을 때
+   * 컴포넌트를 다시 열지 않아도 되게 한다.
+   */
   readonly active: boolean;
 }
 
-export function EventPopup({ active }: EventPopupProps) {
+export function NoticePopup({ active }: NoticePopupProps) {
   const fresh = useSyncExternalStore(NO_SUBSCRIBE, notDismissedYet, () => false);
   const [closed, setClosed] = useState(false);
   const open = active && fresh && !closed;
@@ -92,17 +106,12 @@ export function EventPopup({ active }: EventPopupProps) {
   const titleId = useId();
 
   /**
-   * **닫으면 그날은 다시 뜨지 않는다.**
-   *
-   * 예전에는 이 함수가 `remember = false` 로 시작했다. 그래서 X · Escape ·
-   * 바깥클릭 · "사주 보러 가기" 넷이 아무것도 저장하지 않았고, 저장하는 길은
-   * "오늘 하루 보지 않기" 버튼 하나뿐이었다 — 사주를 한 번 보고 돌아올 때마다
-   * 같은 팝업이 다시 떴다(실측: 저장값 `null`, 매 방문 재등장).
-   *
-   * 닫는 방법마다 뜻이 다를 이유가 없다. 넷 다 "봤고 지금은 됐다" 이다.
+   * **닫는 방법마다 뜻이 다를 이유가 없다.** X 와 확인 버튼 둘 다 "봤고 지금은 됐다"
+   * 이므로 똑같이 기억한다. 예전에 이 함수가 `remember = false` 로 시작해서 닫는
+   * 길 넷 중 셋이 아무것도 저장하지 않았고, 그래서 매 방문 같은 팝업이 다시 떴다.
    */
   function close() {
-    rememberDismissal(kstToday(new Date()));
+    rememberDismissal();
     setClosed(true);
   }
 
@@ -128,11 +137,11 @@ export function EventPopup({ active }: EventPopupProps) {
         className="pointer-events-auto w-full max-w-[26rem] overflow-hidden rounded-card border border-hairline bg-surface text-ink shadow-mockup"
       >
         <div className="flex items-start justify-between gap-3 px-5 pt-5">
-          <p className="font-mono-kr text-[10px] tracking-[0.22em] text-gold-text">EVENT</p>
+          <p className="font-mono-kr text-[10px] tracking-[0.22em] text-gold-text">NOTICE</p>
           <button
             type="button"
             onClick={close}
-            aria-label="이벤트 안내 닫기"
+            aria-label="안내 닫기"
             className="-mr-2 -mt-2 flex min-h-[var(--tap)] min-w-[var(--tap)] items-center justify-center rounded-pill text-muted-2 transition-colors hover:bg-surface-warm hover:text-gold-text-strong"
           >
             <Icon name="close" size={18} />
@@ -148,33 +157,28 @@ export function EventPopup({ active }: EventPopupProps) {
               id={titleId}
               className="font-display text-[19px] font-light leading-[1.35] text-ink"
             >
-              추석 및 오픈 기념
-              <span className="block text-gold-text">이벤트</span>
+              지금은
+              <span className="block text-gold-text">테스트 운영 중</span>
             </h2>
+            {/* 문구는 `payment-mode` 한 곳에서 온다 — 결제 버튼 아래의 고지와
+                한 글자도 달라지면 안 된다. */}
             <p className="mt-2 text-[13.5px] leading-relaxed text-muted">
-              사주풀이와 행운의 번호를
-              <span className="font-bold text-gold-text-strong"> 무료</span>로 이용하실 수
-              있습니다.
+              {TEST_PAYMENT_NOTICE}
             </p>
           </div>
         </div>
 
-        {/* 한글에 등폭 글꼴 + 자간을 주면 "행사기간" 이 "행 사기간" 으로 갈라져
-            읽힌다. 날짜만 등폭으로 두고 라벨은 본문 글꼴 그대로 간다. */}
         <p className="px-5 pt-3 text-[12.5px] leading-relaxed text-muted-2">
-          행사기간 <span className="font-mono-kr">{FREE_EVENT_PERIOD}</span>
+          사주팔자와 풀이는 정상적으로 보실 수 있습니다.
         </p>
 
-        {/* "오늘 하루 보지 않기" 버튼은 걷어냈다. 이제 **어떤 방법으로 닫아도**
-            그날은 다시 뜨지 않으므로, 같은 일을 하는 버튼이 둘이 된다. 하나가
-            특별한 약속을 하는 것처럼 보이는 편이 오히려 거짓말이다. */}
         <div className="mt-4 flex items-center justify-end border-t border-hairline px-5 py-3">
           <button
             type="button"
             onClick={close}
             className="min-h-[var(--tap)] rounded-pill bg-button-gradient px-5 text-[13.5px] font-bold text-on-primary shadow-cta"
           >
-            사주 보러 가기
+            확인했습니다
           </button>
         </div>
       </div>

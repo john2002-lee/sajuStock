@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { QUOTE_DELAY_NOTE } from "@/lib/config/marketHours";
-import { SUPPORT_EMAIL } from "@/lib/config/public";
+import { RETENTION_DAYS, SUPPORT_EMAIL } from "@/lib/config/public";
+import { BUSINESS_INFO, IS_PLACEHOLDER, businessRows } from "@/shared/legal/business";
 
 /**
  * 전역 푸터 — 고지와 서비스 간 이동을 모든 화면에 상시 노출한다.
@@ -85,8 +86,8 @@ export function Footer({
           >
             사주 풀이는 참고용이며, 의료·법률·투자 판단을 대신하지 않습니다.
             무료로 보시는 동안 생년월일시는 서버에 저장되지 않으며, 리포트를
-            구매하신 후 URL을 저장해 두시면 다시 보실 수 있도록 30일간 보관 후
-            삭제합니다.
+            구매하신 후 URL을 저장해 두시면 다시 보실 수 있도록 {RETENTION_DAYS}일간
+            보관 후 삭제합니다.
           </p>
         ) : null}
 
@@ -103,6 +104,18 @@ export function Footer({
           </span>
           <Link href="/privacy" className="hover:text-ink">
             개인정보처리방침
+          </Link>
+          <span aria-hidden className="text-line-30">
+            ·
+          </span>
+          <Link href="/refund" className="hover:text-ink">
+            환불정책
+          </Link>
+          <span aria-hidden className="text-line-30">
+            ·
+          </span>
+          <Link href="/support" className="hover:text-ink">
+            고객센터
           </Link>
           {service !== "stock" ? (
             <>
@@ -131,6 +144,31 @@ export function Footer({
             className="font-mono text-muted-45 text-10 tracking-[0.02em]"
           >
             데이터 제공 Yahoo Finance(yfinance) · KRX · {QUOTE_DELAY_NOTE}
+          </p>
+        ) : null}
+
+        {/* 사업자 정보 — 전자상거래법 제13조가 **모든 화면에서** 볼 수 있기를
+            요구한다. 그래서 개별 문서가 아니라 여기에 둔다.
+
+            **임시값일 때는 아예 그리지 않는다.** 등록되지 않은 번호를 첫 화면부터
+            모든 화면에 뿌리는 것은, 없는 것보다 나쁘다 — 읽는 사람은 그것이 진짜
+            등록번호라고 믿는다. 법적 문서 안에서는 "아직 등록 전" 이라는 고지와
+            함께 나오므로 그쪽은 그대로 둔다(`BusinessInfoTable`).
+            `SUPPORT_EMAIL` 이 비었을 때 연락처 줄을 빼는 것과 같은 규칙이다. */}
+        {!IS_PLACEHOLDER ? (
+          <p className="text-pretty text-muted-45 text-10 leading-[1.7]">
+            {businessRows()
+              .map(([label, value]) => `${label} ${value}`)
+              .join(" · ")}
+            {" · "}
+            <a
+              href={`https://www.ftc.go.kr/bizCommPop.do?wrkr_no=${BUSINESS_INFO.사업자등록번호.replace(/-/g, "")}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="hover:text-ink"
+            >
+              사업자정보 확인
+            </a>
           </p>
         ) : null}
       </div>

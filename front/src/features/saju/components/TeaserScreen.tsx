@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { bff } from "@/lib/http/browser";
 import { SAJU_EVENT } from "@/shared/analytics/events";
-import type { PaymentConfig } from "../model/types";
+import type { PaymentConfig, PaymentState } from "../model/types";
 import { useStoredReading } from "../model/storage";
 import { trackSaju } from "../model/analytics";
 import { markTime, setReportTier } from "../model/analytics-context";
@@ -17,8 +17,14 @@ import { StartOverPrompt, TeaserView } from "./TeaserView";
  * "다시 입력하기" 가 한 번 번쩍인 뒤 결과가 나타난다 — 자세한 이유는
  * `model/storage.ts` 의 `useStoredReading` 주석에 있다.
  *
- * 결제 설정은 **서버에 물어본다.** 키가 없으면 결제 UI 를 그리지 않고 무료로 연다 —
- * 팔 수 없는 상태에서 결제 버튼을 보여 주면 눌러 본 사람이 결제창에서 실패한다.
+ * 결제 설정은 **서버에 물어본다.** 서버가 "키가 없다"(enabled: false)고 답하면
+ * 결제 UI 를 그리지 않고 무료로 연다 — 팔 수 없는 상태에서 결제 버튼을 보여 주면
+ * 눌러 본 사람이 결제창에서 실패한다.
+ *
+ * **못 받은 것과 "꺼짐" 이라고 받은 것은 다르다.** 예전에는 둘 다 null 이라
+ * 조회에 실패하기만 하면 유료 리포트가 무료로 열렸다 — 요청 하나만 막으면 되는
+ * 우회로였다. 지금은 PaymentState 셋으로 갈라 모를 때는 다시 시도하게 한다
+ * (model/types.ts).
  *
  * ## 계측: 왜 마운트가 아니라 "결제 설정이 정해진 뒤" 인가
  *
@@ -27,20 +33,12 @@ import { StartOverPrompt, TeaserView } from "./TeaserView";
  * (그 뒤로는 `report_tier` 가 상속 컨텍스트로 따라다닌다). 화면이 최종 모습을
  * 갖춘 시점이 곧 사람이 "살지 말지" 를 보기 시작하는 시점이기도 하다.
  */
-export interface TeaserScreenProps {
-  /**
-   * 이벤트 무료 기간인가. **페이지(서버 컴포넌트)가 서버 시각으로 판정해 넘긴다.**
-   * 이 화면에서 직접 시각을 재면 기기 시계를 옮기는 것만으로 결제를 건너뛸 수 있다.
-   */
-  freeEvent?: boolean;
-}
-
-export function TeaserScreen({ freeEvent = false }: TeaserScreenProps) {
+export function TeaserScreen() {
   const router = useRouter();
   const stored = useStoredReading();
-  const [payment, setPayment] = useState<PaymentConfig | null>(null);
-  /** 결제 설정 조회가 끝났는가 — 성공이든 실패든. `payment === null` 과 다르다. */
-  const [paymentSettled, setPaymentSettled] = useState(false);
+  const [payment, setPayment] = useState<PaymentState>({ status: "loading" });
+  /** 다시 시도 버튼이 누른 횟수. 값이 바뀌면 아래 effect 가 다시 돈다. */
+  const [attempt, setAttempt] = useState(0);
   const teaserTracked = useRef(false);
 
   useEffect(() => {
@@ -48,35 +46,34 @@ export function TeaserScreen({ freeEvent = false }: TeaserScreenProps) {
     bff
       .get<PaymentConfig>("/api/saju/payment-config")
       .then((data) => {
-        if (!cancelled && data) setPayment(data);
+        if (cancelled) return;
+        // 빈 응답도 못 받은 것이다 — 값이 없으면 결제 여부를 판단할 수 없다.
+        setPayment(data ? { status: "ready", config: data } : { status: "unreachable" });
       })
       .catch(() => {
-        // 못 받으면 `null` 로 남는다 — 결제 UI 없이 무료 경로가 그려진다.
-        // 결제 가능한데 못 파는 것이, 팔 수 없는데 버튼을 보여 주는 것보다 낫다.
-      })
-      .finally(() => {
-        if (!cancelled) setPaymentSettled(true);
+        if (!cancelled) setPayment({ status: "unreachable" });
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   useEffect(() => {
     // 저장된 결과가 없으면 티저가 아니라 "다시 입력하기" 가 그려진다 — 그건
     // 본 것이 아니므로 세지 않는다.
-    if (teaserTracked.current || !stored || !paymentSettled) return;
+    if (teaserTracked.current || !stored || payment.status === "loading") return;
     teaserTracked.current = true;
 
-    setReportTier(payment?.enabled ? "paid" : "free");
+    const config = payment.status === "ready" ? payment.config : null;
+    setReportTier(config?.enabled ? "paid" : "free");
     markTime("teaser_viewed");
     trackSaju(SAJU_EVENT.teaserViewed, {
       // 설정을 못 받았으면 가격을 **모르는** 것이지 0원이 아니다.
-      price_krw: payment?.price ?? null,
-      retention_days: payment?.retention_days ?? null,
-      is_payment_enabled: Boolean(payment?.enabled),
+      price_krw: config?.price ?? null,
+      retention_days: config?.retention_days ?? null,
+      is_payment_enabled: Boolean(config?.enabled),
     });
-  }, [stored, paymentSettled, payment]);
+  }, [stored, payment]);
 
   if (stored === undefined) return null;
   if (stored === null) return <StartOverPrompt />;
@@ -87,7 +84,10 @@ export function TeaserScreen({ freeEvent = false }: TeaserScreenProps) {
       birth={stored.birth}
       payment={payment}
       onOpenReport={() => router.push("/saju/report")}
-      freeEvent={freeEvent}
+      onRetryPayment={() => {
+        setPayment({ status: "loading" });
+        setAttempt((n) => n + 1);
+      }}
     />
   );
 }

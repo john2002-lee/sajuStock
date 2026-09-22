@@ -1,15 +1,28 @@
 /**
- * 친구에게 이 사이트를 보내는 일.
+ * 친구에게 보내는 일.
  *
- * ## 무엇을 보내나 — **주소 하나뿐이다**
+ * ## 무엇을 보내나 — 주소, 또는 **결과 링크**
  *
- * 사주 결과도, 생년월일시도, 어떤 식별자도 링크에 싣지 않는다. 보내는 것은
- * `aiot21.com` 이고, 링크를 받은 사람은 **자기 사주를 새로 본다.** 그래서 이
- * 기능에는 서버도, 저장도, 공유 토큰도 없다 — 주식 쪽 `/verdict/{shareId}` 와
- * 다른 점이 이것이다(그쪽은 남의 판단을 열어 주므로 발급한 id 가 필요하다).
+ * 길이 둘이다.
  *
- * 무료 경로가 아무것도 저장하지 않는다는 약속(`model/storage.ts`)을 공유 기능이
- * 깨지 않는다는 뜻이기도 하다.
+ * - `shareUrl` — 사이트 주소(`aiot21.com`) 하나. 링크를 받은 사람은 자기 사주를
+ *   새로 본다. 결과도, 생년월일시도, 식별자도 실리지 않는다.
+ * - `shareResultUrl` — 발급받은 공유 id 로 만든 `/saju/s/{shareId}`. 링크를 받은
+ *   사람이 **보낸 사람의 여덟 글자**를 본다.
+ *
+ * 둘을 한 함수로 합치지 않았다. 아래 `shareUrl` 의 주석이 "오직 오리진만 보낸다"
+ * 는 **진술**이고, 그 진술이 계속 참이어야 이 모듈을 읽는 사람이 무료 경로가
+ * 무엇을 흘리는지 한 번에 판단할 수 있다.
+ *
+ * ## 결과 링크는 서버에 여덟 글자를 남긴다
+ *
+ * 그 대가와 범위 — 무엇을 담지 않는지, 왜 7일인지 — 는 백엔드
+ * `app/models/saju_share.py` 모듈 주석에 있다. 생년월일시 원본은 **어느 경로에서도
+ * 저장되지 않는다**: 발급 요청에 실려 가지만 서버는 계산에만 쓰고 버린다.
+ *
+ * 링크에는 사주가 실리지 않는다 — `shareId` 는 서버가 낸 128비트 난수이고, 주소
+ * 자체에서 역산할 수 있는 것이 없다. 생년월일시를 쿼리스트링에 싣지 않는다는
+ * `model/storage.ts` 의 판단이 여기서도 유지되는 이유다.
  *
  * ## 왜 카카오 SDK 가 아닌가
  *
@@ -68,6 +81,26 @@ export type ShareOutcome = "shared" | "copied" | "cancelled" | "unsupported" | "
 export function shareUrl(configured: string | undefined, fallback: string): string {
   const origin = configured?.trim() ? configured.trim() : fallback;
   return origin.replace(/\/+$/, "");
+}
+
+/**
+ * 공유된 결과를 여는 주소의 경로. 한 곳에 둔다 — 화면 링크·`robots.ts` 의 차단
+ * 목록·분석 마스킹(`shared/analytics/redact.ts`)이 같은 문자열을 말해야 한다.
+ */
+export const SHARE_PATH = "/saju/s";
+
+/**
+ * 발급받은 공유 id 로 친구에게 보낼 주소를 만든다.
+ *
+ * `origin` 은 이미 `shareUrl` 을 거친 값을 넘긴다 — 끝 슬래시 정리를 두 곳에서
+ * 하면 한쪽을 고칠 때 다른 쪽이 남는다.
+ *
+ * id 를 인코딩하는 것은 `token_urlsafe` 가 URL 안전 알파벳만 쓰기 때문에 사실상
+ * 변화가 없지만, **서버가 id 생성 방식을 바꾸는 날** 이 자리가 조용히 깨지지 않게
+ * 한다.
+ */
+export function shareResultUrl(origin: string, shareId: string): string {
+  return `${origin}${SHARE_PATH}/${encodeURIComponent(shareId)}`;
 }
 
 /**

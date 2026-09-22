@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { IS_PLACEHOLDER, PLACEHOLDER_NOTICE, PRIVACY_OFFICER } from "@/shared/legal/business";
-import { RETENTION_DAYS, SUPPORT_EMAIL } from "@/lib/config/public";
+import { RETENTION_DAYS, SHARE_RETENTION_DAYS, SUPPORT_EMAIL } from "@/lib/config/public";
 import { BusinessInfoTable } from "../_components/BusinessInfoTable";
 import { DocHeading, Section } from "../_components/Section";
 
@@ -15,8 +15,12 @@ import { DocHeading, Section } from "../_components/Section";
  *
  *  - **무료 경로 수집 항목** — `schemas/saju.BirthInput`
  *    (year/month/day/hour/minute/gender/birth_place_code/is_lunar/is_leap_month).
- *    **저장하지 않는다**: `/saju/chart` 와 `/saju/report` 는 DB 를 만지지 않고,
- *    결과는 브라우저 `sessionStorage` 에만 있다(`features/saju/model/storage.ts`).
+ *    **원칙적으로 저장하지 않는다**: `/saju/chart` 와 `/saju/report` 는 DB 를
+ *    만지지 않고, 결과는 브라우저 `sessionStorage` 에만 있다
+ *    (`features/saju/model/storage.ts`). **예외는 결과 공유 링크 하나다** —
+ *    `POST /saju/shares` 가 여덟 글자와 요약을 `models/saju_share.SajuShareRow` 에
+ *    `saju_share_retention_days`(7일)간 보관한다. 생년월일시는 그 경로에서도
+ *    저장되지 않는다(계산에만 쓰고 버린다).
  *  - **유료 경로 수집 항목** — `models/saju_order.SajuOrderRow` 가 생년월일시를
  *    JSONB 로 보관하고 `SajuReportRow` 가 리포트 본문을 보관한다. 계정을 요구하지
  *    않으므로 이 둘이 사주 쪽에서 저장되는 전부다.
@@ -84,6 +88,20 @@ export default function PrivacyPolicyPage() {
             위 항목을 서버에 저장하지 않습니다.
           </strong>{" "}
           계산에만 쓰고 응답과 함께 버리며, 결과는 이용하시는 브라우저 안에만 남습니다.
+        </p>
+        <p>
+          다만{" "}
+          <strong className="font-semibold text-ink">결과 공유 링크를 만드실 때</strong>
+          에는, 계산된 사주 여덟 글자와 무료 요약(일간·오행 분포·강약 판정 포함)을
+          링크로 열 수 있도록{" "}
+          <strong className="font-semibold text-ink">{SHARE_RETENTION_DAYS}일간</strong>{" "}
+          보관한 후 파기합니다. 공유 버튼을 누르지 않으시면 이 보관은 발생하지 않으며,
+          이 경우에도{" "}
+          <strong className="font-semibold text-ink">
+            생년월일시·성별·출생지 원문은 저장하지 않습니다.
+          </strong>{" "}
+          공유 링크는 주소를 아는 사람이면 누구나 열 수 있으므로 원하지 않는 상대에게
+          전달되지 않도록 유의하시기 바랍니다.
         </p>
 
         <p className="pt-2">
@@ -168,6 +186,11 @@ export default function PrivacyPolicyPage() {
           주문·리포트·추가 질문은 주문 생성일로부터{" "}
           <strong className="font-semibold text-ink">{RETENTION_DAYS}일</strong>이 경과하면
           지체없이 파기합니다.
+        </p>
+        <p>
+          결과 공유 링크에 담긴 사주 여덟 글자와 무료 요약은 링크 생성일로부터{" "}
+          <strong className="font-semibold text-ink">{SHARE_RETENTION_DAYS}일</strong>이
+          경과하면 열람이 차단되며 파기합니다.
         </p>
         <p>
           다만 관련 법령(전자상거래 등에서의 소비자보호에 관한 법률, 전자금융거래법 등)에서

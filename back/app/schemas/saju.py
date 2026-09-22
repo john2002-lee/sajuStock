@@ -476,3 +476,61 @@ class SajuPaymentConfig(BaseModel):
     enabled: bool
     price: int
     retention_days: int
+
+
+# ---------------------------------------------------------------------------
+# 결과 공유 링크 (endpoints/saju_shares.py)
+# ---------------------------------------------------------------------------
+
+
+class SajuShareRequest(BaseModel):
+    """공유 링크 발급 요청. **결과가 아니라 생년월일시를 받는다.**
+
+    화면이 계산해 둔 여덟 글자를 그대로 받는 편이 왕복이 없어 싸다. 그런데 그 길은
+    본문을 **위조할 수 있다** — `summary` 는 자유 텍스트이고, 그것이 우리 도메인의
+    공개 페이지와 링크 미리보기 카드에 우리 브랜드로 실린다. 주식 쪽
+    `AdviceVerdictCreate` 가 위조 가능성을 감수하는 것과 사정이 다르다: 그쪽의
+    위조물은 **자기 비공개 목록**에 들어가고, 이쪽은 공개된다.
+
+    생년월일시를 받아 서버가 다시 계산하면 `BirthInput` 의 검증(1920년 하한·윤달
+    존재·없는 날짜·시분 짝)을 그대로 재사용하고, 좁히기가 약속이 아니라 **구조적
+    보장**이 된다. 계산은 순수 함수이고 밀리초 단위라 비용도 사실상 없다.
+
+    이 값은 **저장되지 않는다.** 계산에만 쓰고 응답과 함께 버린다 —
+    `POST /saju/chart` 와 같다(`endpoints/saju.py` 모듈 주석).
+    """
+
+    birth: BirthInput
+
+
+class SajuShareCreated(BaseModel):
+    """발급 결과. 화면이 이 id 로 주소를 만든다.
+
+    `retention_days` 를 함께 내리는 이유는 `SajuPaymentConfig.retention_days` 와
+    같다 — 화면이 "N일 후 만료" 를 말해야 하고, 그 수의 원본은 서버 한 곳이어야 한다.
+    """
+
+    share_id: str
+    retention_days: int
+
+
+class SajuSharedReading(BaseModel):
+    """공유 링크를 연 사람이 보는 것. **인증 없이 나가는 응답이다.**
+
+    `TeaserOut` 을 재사용하지 않는다. 그쪽에 `char_count` 가 있어서가 아니라
+    (그 값은 `len(pillars_hangul)` 로 나오므로 새는 것이 없다), 타입을 따로 두면
+    "무엇을 공개하는가" 가 약속이 아니라 **타입 시스템의 사실**이 되기 때문이다.
+    주식 쪽 `AdviceVerdictShared` 가 소유자·심볼·가격을 빼면서 같은 일을 한다.
+
+    담기지 않는 것: 생년월일시, `solar_date`(그 한 칸이 곧 생년월일이다), 출생지,
+    진태양시 보정 분값(조합이 곧 경도다), 리포트 본문, 추가 질문.
+    """
+
+    pillars_hangul: list[str]
+    day_master_hangul: str
+    visible_wuxing: dict[str, int]
+    strength_verdict: str
+    summary: str
+    #: 화면이 "N일 후 만료" 를 계산하는 기준.
+    created_at: str
+    retention_days: int

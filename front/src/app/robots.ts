@@ -71,6 +71,11 @@ export default function robots(): MetadataRoute.Robots {
         "/saju/pay/",
         "/saju/teaser",
         "/saju/report",
+        // `/saju/s/` — 공유된 **남의** 여덟 글자다. `shareId` 는 128비트 난수라
+        // 추측으로 닿을 수 없지만 크롤러는 링크를 따라온다: 누군가 이 주소를
+        // 공개된 곳에 붙이는 순간 검색 결과에 남고, 그때 "링크를 아는 사람만" 이라는
+        // 약속이 깨진다. 페이지의 `noindex` 와 이중으로 막는다.
+        "/saju/s/",
       ],
     },
   };

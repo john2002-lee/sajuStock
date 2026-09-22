@@ -16,6 +16,27 @@ test("유료 리포트 토큰을 지운다 — 그 토큰이 곧 자격 증명�
   );
 });
 
+test("공유 링크의 id 를 지운다 — 남의 여덟 글자를 여는 포인터다", () => {
+  assert.equal(
+    redactUrl("https://aiot21.com/saju/s/x7Kq2mP9abcDEF-_"),
+    "https://aiot21.com/saju/s/[share]",
+  );
+  // 경로만 실리는 속성도 있다 (`[Amplitude] Page Path`).
+  assert.equal(redactUrl("/saju/s/abc123"), "/saju/s/[share]");
+  // 뒤에 질의·조각이 붙어도 id 조각만 지운다 — 유입 분석은 살아야 한다.
+  assert.equal(
+    redactUrl("/saju/s/abc?utm_source=kakao#top"),
+    "/saju/s/[share]?utm_source=kakao#top",
+  );
+  // 토큰 자리값과 **다른** 문자열이어야 한다. 콘솔에서 둘을 구분해야 한다.
+  assert.notEqual(redactUrl("/saju/s/abc"), redactUrl("/saju/reports/abc"));
+});
+
+test("`/saju/s` 뒤에 id 가 없으면 손대지 않는다", () => {
+  assert.equal(redactUrl("/saju/s"), "/saju/s");
+  assert.equal(redactUrl("/saju/s/"), "/saju/s/");
+});
+
 test("토스가 돌려주는 결제 자격 증명을 지운다", () => {
   assert.equal(
     redactUrl("/saju/pay/success?paymentKey=tviva20240101&orderId=od_1&amount=9900"),

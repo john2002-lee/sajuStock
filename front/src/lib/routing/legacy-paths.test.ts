@@ -34,6 +34,9 @@ describe("legacyRedirect — 건드리지 않는 것", () => {
     "/saju/intro",
     "/saju/pay/success",
     "/saju/pay/fail",
+    // 공유 링크. 친구가 받은 주소가 홈으로 튕기면 **남이 보낸 사주를 볼 방법이
+    // 없어진다** — 그리고 보낸 사람은 그 사실을 알지 못한다.
+    "/saju/s/x7Kq2mP9abcDEF-_",
   ]) {
     test(`하위 화면은 그대로 — ${path}`, () => {
       assert.equal(legacyRedirect(path), null);

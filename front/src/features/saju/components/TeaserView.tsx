@@ -188,7 +188,7 @@ export function TeaserView({
       {/* 공유는 **관례 고지 앞**이다. 고지 뒤로 내리면 읽기가 끝난 자리가 아니라
           잔글씨 뒤가 되어 눈에 들어오지 않는다. 리포트 카드 바로 다음이 이 화면에서
           "재미있었다" 가 가장 큰 지점이다. */}
-      <ShareButton surface="teaser" className="pt-2" />
+      <ShareButton surface="teaser" birth={birth} className="pt-2" />
 
       <ConventionNotice />
     </div>

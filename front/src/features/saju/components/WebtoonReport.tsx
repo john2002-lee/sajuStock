@@ -74,6 +74,19 @@ export interface WebtoonReportProps {
    * 방법이 서로 다르다. 이 컴포넌트가 그 차이를 알 이유가 없으므로 슬롯으로 받는다.
    */
   followUp?: ReactNode;
+  /**
+   * 공유 버튼. **호출부가 넘긴다** — `followUp` 과 같은 이유이고, 그 이유가 여기서
+   * 더 날카롭다.
+   *
+   * 결과 링크를 발급하려면 **생년월일시**가 필요하다. 무료 경로는 그것을 들고 있고
+   * (`stored.birth`) 유료 경로는 토큰만 든다. 이 컴포넌트가 버튼을 직접 그리면 두
+   * 화면 중 하나는 반드시 틀린 것을 보낸다.
+   *
+   * 그리고 이 슬롯이 **`/saju/reports/{token}` 이 공유될 수 없게 만드는 장치**이기도
+   * 하다 — 여기에 토큰이 들어올 길이 없으므로, 전체 접근 자격증명이 실수로 공유
+   * 주소가 되는 일이 구조적으로 불가능하다.
+   */
+  share?: ReactNode;
 }
 
 export function WebtoonReport({
@@ -83,6 +96,7 @@ export function WebtoonReport({
   strengthVerdict,
   source,
   followUp,
+  share,
 }: WebtoonReportProps) {
   const sections = splitSections(markdown);
   const preamble = extractPreamble(markdown);
@@ -177,6 +191,11 @@ export function WebtoonReport({
           리포트 위에 두거나 탭 뒤에 두면 아직 읽지도 않은 리포트에 대해 말을 걸라고
           요구하는 화면이 된다. */}
       {followUp}
+
+      {/* 공유는 **일러두기 앞**이다. 잔글씨 뒤로 내리면 읽기가 끝난 자리가 아니라
+          부록이 되어 눈에 들어오지 않는다 — 티저가 관례 고지 앞에 두는 것과 같은
+          판단이다. */}
+      {share}
 
       <Panel>
         <PanelLabel>일러두기</PanelLabel>

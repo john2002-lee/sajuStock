@@ -12,6 +12,7 @@ import { extractPreamble, splitSections } from "../model/sections";
 import { fromBirthInput } from "../services/wire";
 import { JobTimeoutError, jobErrorMessage, runJob } from "../services/jobs";
 import { Shaman } from "./Shaman";
+import { ShareButton } from "./ShareButton";
 import { StartOverPrompt } from "./TeaserView";
 import { FollowUpChat } from "./FollowUpChat";
 import { WaitingPanel } from "./WaitingPanel";
@@ -209,6 +210,8 @@ export function ReportScreen() {
       strengthVerdict={stored.reading.strength.verdict}
       source={report.source}
       followUp={<FollowUpChat target={{ birth: stored.birth }} />}
+      /* 무료 경로는 생년월일시를 들고 있으므로 **결과 링크**를 보낸다. */
+      share={<ShareButton surface="report" birth={stored.birth} />}
     />
   );
 }

@@ -1,5 +1,5 @@
 No,Label,Event Name,Trigger,Required,Importance,Event Property,Description,Data Type,Value Example,Analysis,Note
-0.1,_context,(상속 컨텍스트),trackSaju() 래퍼가 모든 사주 이벤트에 자동 병합한다. 개별 이벤트 행에는 다시 적지 않는다.,Y,Critical,root_path,제품 안에서 어느 문으로 들어왔는가. 세션 최초 1회만 확정한다.,String,root | intro | unknown,진입 문별 결제 전환율,마케팅 채널이 아니다 — utm·referrer 는 오토캡처 attribution 이 채운다
+0.1,_context,(상속 컨텍스트),trackSaju() 래퍼가 모든 사주 이벤트에 자동 병합한다. 개별 이벤트 행에는 다시 적지 않는다.,Y,Critical,root_path,제품 안에서 어느 문으로 들어왔는가. 세션 최초 1회만 확정한다.,String,root | intro | share | unknown,진입 문별 결제 전환율 · 공유 링크가 실제로 사람을 데려오는가,마케팅 채널이 아니다 — utm·referrer 는 오토캡처 attribution 이 채운다. share 는 친구가 보낸 /saju/s/ 링크에서 넘어온 사람이고 공유 기능의 유일한 성과 지표다
 0.2,_context,(상속 컨텍스트),,Y,Critical,report_tier,무료/유료 모드. 티저에서 payment.enabled 로 확정하고 유료 리포트 화면에서 다시 확정한다.,String,free | paid,두 모드의 행동 차이,서버 /saju/payment/config 가 원천
 0.3,_context,(상속 컨텍스트),,Y,High,day_master,일간(日干) 한 글자. 사주 계산 성공 이후 병합하고 새 계산이 덮는다.,String,jia | yi | bing | ding | wu | ji | geng | xin | ren | gui,퍼널 Holding Constant — 일간별 결제 전환율,한자·한글 금지. 10분의 1로만 좁혀 역산 불가
 0.4,_context,(상속 컨텍스트),,Y,Medium,dominant_element,드러난 글자의 오행 최다 원소. 동점은 목화토금수 순서로 끊는다.,String,wood | fire | earth | metal | water,오행 편중과 추가질문 사용률의 상관,결정적이어야 한다 — 객체 키 순서에 맡기지 않는다
@@ -72,8 +72,9 @@ No,Label,Event Name,Trigger,Required,Importance,Event Property,Description,Data 
 15.4,saju_engagement,saju_report_reopened,,Y,Low,report_source,llm/fallback.,String,llm,,
 15.5,saju_engagement,saju_report_reopened,,Y,Low,section_count,섹션 수.,Number,5,,
 15.6,saju_engagement,saju_report_reopened,,Y,Low,has_preamble,머리말 유무.,Boolean,true,,
-16.1,saju_engagement,saju_site_shared,친구에게 알려주기 클릭이 끝난 뒤. 취소·미지원도 함께 센다.,Y,High,outcome,무슨 일이 일어났나.,String,shared | copied | cancelled | unsupported | failed,공유 시트가 실제로 동작하는가 — cancelled 가 많으면 문구 문제,취소는 실패가 아니다. 한 칸에 합치면 둘 다 못 읽는다
+16.1,saju_engagement,saju_site_shared,공유 버튼 클릭이 끝난 뒤. 취소·미지원도 함께 센다.,Y,High,outcome,무슨 일이 일어났나.,String,shared | copied | cancelled | unsupported | failed,공유 시트가 실제로 동작하는가 — cancelled 가 많으면 문구 문제,취소는 실패가 아니다. 한 칸에 합치면 둘 다 못 읽는다
 16.2,saju_engagement,saju_site_shared,,Y,High,surface,어느 화면의 버튼인가.,String,teaser | report,티저 공유와 완독 후 공유는 동기가 다르다,
+16.3,saju_engagement,saju_site_shared,,Y,High,share_kind,결과 링크가 실제로 나갔나.,String,result | site,결과를 보낸 공유와 사이트만 보낸 공유의 비율,birth 를 받았는지가 아니라 발급이 성공했는지다 — 실패하면 조용히 site 로 떨어지고 그 둘을 합치면 영원히 못 본다. 유료 리포트 화면은 언제나 site 다(토큰만 들고 있어 발급할 수 없다)
 17.1,saju_purchase,saju_intro_completed,소개 웹툰의 마지막 패널이 뷰포트에 들어옴.,N,Low,panel_index_max,도달한 최대 패널 번호.,Number,12,소개 완주율 — 콘텐츠 길이 조정,Phase 2
 17.2,saju_purchase,saju_intro_completed,,N,Low,scroll_seconds,소개 화면 체류 초.,Number,55,완주자의 입력 착수율,Phase 2
 18.1,saju_engagement,saju_expired_report_opened,보관 기간이 지난 토큰으로 접근.,N,Low,days_since_purchase,결제일로부터 경과 일수.,Number,45,보관 기간 연장 수요,Phase 2

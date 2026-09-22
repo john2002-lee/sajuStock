@@ -17,6 +17,7 @@ import type {
   SajuReading,
   SajuReport,
   SeUn,
+  SharedReading,
   Strength,
   StrengthVerdict,
   Teaser,
@@ -111,6 +112,21 @@ export interface WireReport {
   markdown: string;
   sections: Array<{ heading: string; body: string }>;
   source: "llm" | "fallback";
+}
+
+export interface WireShareCreated {
+  share_id: string;
+  retention_days: number;
+}
+
+export interface WireSharedReading {
+  pillars_hangul: string[];
+  day_master_hangul: string;
+  visible_wuxing: Record<string, number>;
+  strength_verdict: string;
+  summary: string;
+  created_at: string;
+  retention_days: number;
 }
 
 function toPillar(wire: WirePillarDetail): PillarDetail {
@@ -237,6 +253,20 @@ export function toReading(wire: WireReading): SajuReading {
 
 export function toReport(wire: WireReport): SajuReport {
   return { markdown: wire.markdown, sections: wire.sections, source: wire.source };
+}
+
+export function toSharedReading(wire: WireSharedReading): SharedReading {
+  return {
+    pillarsHangul: wire.pillars_hangul,
+    dayMasterHangul: wire.day_master_hangul,
+    visibleWuxing: wire.visible_wuxing,
+    // 위 `toVerdict` 와 같은 이유로 좁힌다 — 백엔드가 판정 이름을 하나 늘리는
+    // 것만으로 공유 페이지가 멈추면 안 된다.
+    strengthVerdict: toVerdict(wire.strength_verdict),
+    summary: wire.summary,
+    createdAt: wire.created_at,
+    retentionDays: wire.retention_days,
+  };
 }
 
 export function toPlaces(wire: { places: BirthPlace[] }): BirthPlace[] {

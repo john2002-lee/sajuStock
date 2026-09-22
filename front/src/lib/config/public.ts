@@ -76,6 +76,23 @@ export const RETENTION_DAYS = Number(process.env.NEXT_PUBLIC_SAJU_RETENTION_DAYS
 export const REPORT_PRICE = 1000;
 
 /**
+ * 결과 공유 링크의 보관 기간(일). 위 `RETENTION_DAYS` 와 값이 같지만 **묶여 있지
+ * 않다** — 그쪽은 돈을 받고 한 약속이라 판매가 시작되면 구매 시점의 약관에 붙들리고,
+ * 이쪽은 아니다. 백엔드에서도 설정이 둘로 나뉘어 있는 것과 같은 이유다.
+ *
+ * 진짜 출처는 백엔드의 `saju_share_retention_days` 이고, 공유 화면은 그 값을 응답에
+ * 실어 받는다(`SajuSharedReading.retention_days`). 그런데 개인정보처리방침은 공유
+ * 기록을 조회할 이유가 없는 정적 문서다 — 위 `RETENTION_DAYS` 가 존재하는 것과
+ * 똑같은 이유로 여기에도 값이 하나 필요하다.
+ *
+ * 그래서 여기에 두고, 백엔드와 어긋나지 않도록 **기본값을 같게** 맞춘다.
+ * 백엔드에서 이 값을 바꾸면 `SAJU_SHARE_RETENTION_DAYS` 도 함께 설정해야 한다.
+ */
+export const SHARE_RETENTION_DAYS = Number(
+  process.env.NEXT_PUBLIC_SAJU_SHARE_RETENTION_DAYS ?? 7,
+);
+
+/**
  * Amplitude 수집 키. **브라우저에 나가는 것이 정상인 값이다** — 이벤트를 어느
  * 프로젝트로 보낼지 가리키는 공개 식별자이고, 이 키로 데이터를 읽을 수는 없다.
  * 그래서 위의 `ADVICE_API_KEY` 류와 달리 `NEXT_PUBLIC_` 을 붙이는 것이 맞다.

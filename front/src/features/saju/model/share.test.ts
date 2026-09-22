@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { shareLink, shareUrl } from "./share.ts";
+import { shareLink, shareResultUrl, shareUrl } from "./share.ts";
 
 /**
  * 여기서 지키는 것은 **취소를 실패로 읽지 않는가** 와 **취소한 사람의 클립보드를
@@ -37,6 +37,32 @@ describe("shareUrl", () => {
 
   test("공백뿐인 값도 미설정으로 본다", () => {
     assert.equal(shareUrl("   ", "http://localhost:3000"), "http://localhost:3000");
+  });
+});
+
+describe("shareResultUrl", () => {
+  test("발급받은 id 로 결과 주소를 만든다", () => {
+    assert.equal(
+      shareResultUrl("https://aiot21.com", "x7Kq2mP9abcDEF_-"),
+      "https://aiot21.com/saju/s/x7Kq2mP9abcDEF_-",
+    );
+  });
+
+  test("오리진을 다시 손질하지 않는다 — `shareUrl` 이 이미 한 일이다", () => {
+    // 끝 슬래시 정리를 두 곳에서 하면 한쪽만 고치는 날이 온다. 이 함수는
+    // `shareUrl` 을 거친 값을 받는다는 전제를 못박아 둔다.
+    assert.equal(shareResultUrl("https://aiot21.com/", "abc"), "https://aiot21.com//saju/s/abc");
+  });
+
+  test("id 를 인코딩한다 — 서버가 생성 방식을 바꿔도 깨지지 않게", () => {
+    assert.equal(shareResultUrl("https://aiot21.com", "a/b?c"), "https://aiot21.com/saju/s/a%2Fb%3Fc");
+  });
+
+  test("로컬에서도 만들어진다", () => {
+    assert.equal(
+      shareResultUrl(shareUrl(undefined, "http://localhost:3000"), "abc"),
+      "http://localhost:3000/saju/s/abc",
+    );
   });
 });
 

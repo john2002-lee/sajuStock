@@ -85,6 +85,16 @@ describe("리퍼러 → 진입 문", () => {
     );
   });
 
+  test("공유 링크에서 왔으면 share — 이 기능의 유일한 성과 지표다", () => {
+    assert.equal(rootPathFromReferrer(`${ORIGIN}/saju/s/x7Kq2mP9`, ORIGIN), "share");
+  });
+
+  test("`/saju/s` 가 `/saju/` 의 다른 화면을 삼키지 않는다", () => {
+    // 지금은 `/saju/summary` 같은 주소가 없지만, 생기는 날 이 테스트가 먼저
+    // 깨지는 편이 공유 유입이 조용히 부풀는 것보다 낫다.
+    assert.equal(rootPathFromReferrer(`${ORIGIN}/saju/summary`, ORIGIN), "root");
+  });
+
   test("리퍼러가 없으면 root — 주소를 직접 열었거나 북마크다", () => {
     assert.equal(rootPathFromReferrer("", ORIGIN), "root");
   });

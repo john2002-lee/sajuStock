@@ -15,6 +15,7 @@ import { extractPreamble, splitSections } from "../model/sections";
 import { loadViews, recordView, saveViews } from "../model/report-views";
 import { abortableSleep } from "../services/jobs";
 import { Shaman } from "./Shaman";
+import { ShareButton } from "./ShareButton";
 import { FollowUpChat, toFollowUpInitial, type FollowUpInitial } from "./FollowUpChat";
 import { WaitingPanel } from "./WaitingPanel";
 import { WebtoonReport } from "./WebtoonReport";
@@ -269,6 +270,14 @@ export function PaidReportScreen({ token }: { token: string }) {
         strengthVerdict={report.strengthVerdict}
         source={report.source}
         followUp={<FollowUpChat target={{ token }} initial={report.followUp} />}
+        /* `birth` 를 넘기지 **않는다** — 이 화면에는 없다(토큰만 든다). 그래서
+           사이트 주소만 나간다.
+
+           `token` 을 넘겨 주소를 만들고 싶어질 수 있는데, 그러면 안 된다: 그
+           토큰은 인증 없이 통과하는 **전체 접근 자격증명**이고 응답에 양력
+           생년월일과 추가 질문 원문이 들어 있다. 유료 사용자도 결과 링크를
+           보내게 하려면 토큰으로 발급하는 백엔드 경로가 따로 필요하다. */
+        share={<ShareButton surface="report" />}
       />
     </>
   );

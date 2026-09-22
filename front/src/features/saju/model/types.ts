@@ -103,6 +103,29 @@ export interface Teaser {
   summary: string;
 }
 
+/**
+ * 공유 링크(`/saju/s/{shareId}`)를 연 사람이 보는 것.
+ *
+ * `Teaser` 와 필드가 거의 같지만 **타입을 합치지 않는다.** 이쪽은 서버가 인증 없이
+ * 내려주는 투영이고, 합쳐 두면 `Teaser` 에 칸이 하나 붙는 날 그것이 공개 응답에도
+ * 따라 붙는 것처럼 읽힌다. 백엔드가 `TeaserOut` 과 `SajuSharedReading` 을 갈라 둔
+ * 것과 같은 이유다.
+ *
+ * `charCount` 가 없다 — `pillarsHangul.length` 로 나오는 값이라 새는 것은 없지만,
+ * 없는 칸은 실수로 채울 수도 없다.
+ */
+export interface SharedReading {
+  pillarsHangul: string[];
+  dayMasterHangul: string;
+  visibleWuxing: Record<string, number>;
+  strengthVerdict: StrengthVerdict;
+  summary: string;
+  /** ISO 문자열. 화면이 "N일 후 만료" 를 계산하는 기준. */
+  createdAt: string;
+  /** 서버가 정한 보관 기간(일). 화면에 상수로 두지 않는다. */
+  retentionDays: number;
+}
+
 export interface DaYun {
   /** **세는나이**다 — 만 나이가 아니다 (백엔드 `domain/saju/luck.py` 주석). */
   startAge: number;

@@ -228,6 +228,19 @@ class Settings(BaseSettings):
     #: 보관 기간이 바뀐 날(KST). 이 앞뒤로 적용할 약속이 갈린다.
     saju_retention_changed_on: date = date(2026, 9, 21)
 
+    #: 결과 공유 링크의 보관 기간(일).
+    #:
+    #: 위 `saju_order_retention_days` 와 **값이 같지만 묶여 있지 않다.** 그쪽은 돈을
+    #: 받고 한 약속이라 판매가 시작되면 구매 시점의 약관에 붙들리고, 이쪽은 공유
+    #: 버튼을 누른 사람의 여덟 글자를 잠깐 들고 있는 것이다. 설정을 둘로 나눠 둔
+    #: 이유가 그것이다 — 한쪽이 움직일 때 다른 쪽이 따라가면 안 된다.
+    #:
+    #: 만료는 **조회 쿼리가 강제한다**(`SajuShareRepository.get`). `saju_purge_service`
+    #: 가 만료된 주문을 실제로 지우지만 그것은 크론이 아니라 요청 경로에 얹혀 도는
+    #: 기회주의적 정리다 — 트래픽이 없으면 돌지 않는다. 공유 링크에서 "만료됐는데
+    #: 아직 열리는" 상태는 7일이라는 말을 거짓으로 만들므로, 삭제에 의존하지 않는다.
+    saju_share_retention_days: int = Field(default=7, ge=1)
+
     @property
     def saju_payment_enabled(self) -> bool:
         """결제를 팔 수 있는 상태인가.

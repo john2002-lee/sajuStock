@@ -34,6 +34,16 @@ export interface StoredReading {
   /** 리포트와 추가 질문이 서버에 다시 보내야 하는 원본 입력. */
   birth: BirthInput;
   reading: SajuReading;
+  /**
+   * 발급받은 결과 공유 id. 공유 버튼을 누른 적이 없으면 없다.
+   *
+   * **별도 키가 아니라 이 안에 있는 것이 요점이다.** 한 기기로 본인·배우자·자녀의
+   * 사주를 대신 보는 것이 이 제품의 지배적 사용 행태라(`docs/analytics/
+   * saju-amplitude-taxonomy.md`), 옆에 따로 두면 새 사주를 입력한 뒤 공유를 눌렀을
+   * 때 **앞사람의 링크가 나간다.** `saveReading` 이 객체를 통째로 덮으므로 여기
+   * 있으면 새 계산이 id 를 함께 무효화한다.
+   */
+  shareId?: string;
 }
 
 export function saveReading(value: StoredReading): void {

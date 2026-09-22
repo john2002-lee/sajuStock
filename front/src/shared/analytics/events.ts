@@ -86,6 +86,9 @@ export type EventProperties = Record<string, EventPropertyValue | undefined>;
  *   - `root` — 루트(`/`)로 바로 들어왔다. 검색·광고·직접 입력이 전부 여기다
  *     (어느 채널이었는지는 attribution 이 말한다)
  *   - `intro` — 소개 웹툰을 읽고 넘어왔다
+ *   - `share` — 친구가 보낸 공유 링크(`/saju/s/…`)를 보고 넘어왔다. **이 기능이
+ *     실제로 사람을 데려오는지**를 말하는 유일한 값이고, 여기까지 와서 사주를 본
+ *     비율이 곧 바이럴 계수의 분자다
  *   - `unknown` — 리퍼러를 해석하지 못했다. 추측하지 않는다
  *
  * 옛 `/saju` 주소로 들어온 사람은 여기서 구분하지 않는다. 307 리다이렉트는
@@ -93,7 +96,7 @@ export type EventProperties = Record<string, EventPropertyValue | undefined>;
  * 붙이거나(깨끗한 주소를 포기) 분석만을 위한 쿠키를 굽어야 한다. **그 질문은 서버
  * 로그가 이미 답한다** — Amplitude 가 답할 질문이 아니다.
  */
-export type RootPath = "root" | "intro" | "unknown";
+export type RootPath = "root" | "intro" | "share" | "unknown";
 
 export type ReportTier = "free" | "paid";
 

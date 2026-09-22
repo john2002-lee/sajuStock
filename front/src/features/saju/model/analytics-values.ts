@@ -3,6 +3,7 @@ import type {
   DominantElement,
   RootPath,
 } from "@/shared/analytics/events";
+import { SHARE_PATH } from "./share";
 
 /**
  * 사주 계산 결과에서 **이벤트에 실을 두 값**을 뽑는다.
@@ -95,9 +96,13 @@ export function toDominantElement(
 /**
  * 리퍼러에서 **어느 문으로 들어왔는지**를 읽는다.
  *
- * 소개 화면을 거쳤는지만 따로 센다. 나머지는 전부 `root` 이고, 검색이었는지
- * 광고였는지는 오토캡처 attribution 이 utm·리퍼러로 이미 말해 준다 — 여기서 같은
- * 것을 두 번 세면 두 값이 언젠가 어긋난다.
+ * 따로 세는 문이 둘이다 — 소개 화면(`intro`)과 **친구가 보낸 공유 링크**(`share`).
+ * 나머지는 전부 `root` 이고, 검색이었는지 광고였는지는 오토캡처 attribution 이
+ * utm·리퍼러로 이미 말해 준다 — 여기서 같은 것을 두 번 세면 두 값이 언젠가 어긋난다.
+ *
+ * `share` 를 세는 이유는 그것이 **공유 기능의 유일한 성과 지표**이기 때문이다.
+ * 발급·클릭은 보낸 쪽 이야기이고, 실제로 사람이 왔는지는 이 값만이 안다. 섞으면
+ * 서버에 여덟 글자를 7일 저장하기로 한 거래가 남는 장사였는지 판단할 근거가 없다.
  *
  * 리퍼러를 해석하지 못하면 `unknown` 이다. `root` 로 접으면 "직접 들어온 사람"
  * 안에 정체불명이 섞이는데, 그건 나중에 되돌릴 수 없는 오염이다.
@@ -113,6 +118,12 @@ export function rootPathFromReferrer(
   try {
     const from = new URL(referrer);
     if (from.origin !== origin) return "root";
+    // 공유 링크를 먼저 본다. `SHARE_PATH` 를 문자열로 다시 적지 않는 것은,
+    // 경로가 바뀌는 날 이 값이 조용히 `root` 로 떨어지는 것을 막으려는 것이다.
+    //
+    // **끝의 슬래시가 중요하다.** `SHARE_PATH` 만으로 비교하면 `/saju/summary`
+    // 처럼 같은 접두사를 가진 다른 주소가 함께 걸려 공유 유입이 부풀어 오른다.
+    if (from.pathname.startsWith(`${SHARE_PATH}/`)) return "share";
     return from.pathname.startsWith("/saju/intro") ? "intro" : "root";
   } catch {
     return "unknown";

@@ -53,6 +53,21 @@ const SECRET_PARAMS = [
 ] as const;
 
 const REPORT_TOKEN = /(\/saju\/reports\/)[^/?#\s]+/g;
+
+/**
+ * 공유 링크의 id.
+ *
+ * **자격 증명은 아니지만 자격 증명처럼 다룬다.** `/saju/s/{shareId}` 는 인증 없이
+ * 열리는 주소이고, 그 안에 남의 **여덟 글자**가 있다. 이 택소노미가
+ * `four_pillars`·`daeun` 을 통째로 막는 이유가 "네 기둥과 대운의 조합은 생년월일시로
+ * 역산된다" 인데(§6), 그 값을 가리키는 포인터를 Amplitude 에 흘리면 같은 결과가
+ * 한 단계 늘어난 형태로 일어난다 — 대시보드를 볼 수 있는 사람이 링크를 열면 된다.
+ *
+ * 자리값을 토큰과 다르게 두는 것은, 콘솔에서 둘을 구분해야 하기 때문이다.
+ */
+const SHARE_ID = /(\/saju\/s\/)[^/?#\s]+/g;
+const SHARE_PLACEHOLDER = "[share]";
+
 const SECRET_QUERY = new RegExp(
   `([?&])(${SECRET_PARAMS.join("|")})=[^&#\s]*`,
   "gi",
@@ -66,6 +81,7 @@ const SECRET_QUERY = new RegExp(
 export function redactUrl(value: string): string {
   return value
     .replace(REPORT_TOKEN, `$1${TOKEN_PLACEHOLDER}`)
+    .replace(SHARE_ID, `$1${SHARE_PLACEHOLDER}`)
     .replace(SECRET_QUERY, `$1$2=${VALUE_PLACEHOLDER}`);
 }
 
@@ -117,6 +133,10 @@ const BLOCKED_KEYS = new Set([
   "answertext",
   "freetext",
   "sajusummary",
+  // 공유 링크의 id. 지금 이 이름으로 보내는 이벤트는 없다 — **없는 동안 넣어 두는
+  // 것이 요점이다.** 나중에 누가 "발급된 id 도 같이 보내자" 고 하는 날, 그것이
+  // 남의 여덟 글자를 여는 포인터라는 사실을 아무도 다시 떠올리지 않는다.
+  "shareid",
 ]);
 
 /**

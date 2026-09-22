@@ -13,6 +13,7 @@ from app.repositories.investor_profile import InvestorProfileRepository
 from app.repositories.listed_company import ListedCompanyRepository
 from app.repositories.llm_usage import LlmUsageRepository
 from app.repositories.saju_order import SajuOrderRepository
+from app.repositories.saju_share import SajuShareRepository
 from app.repositories.visit import VisitRepository
 from app.repositories.watchlist import WatchlistRepository
 
@@ -129,3 +130,10 @@ def get_saju_order_repository(db: DbSession) -> SajuOrderRepository:
 
 
 SajuOrderRepo = Annotated[SajuOrderRepository, Depends(get_saju_order_repository)]
+
+
+def get_saju_share_repository(db: DbSession) -> SajuShareRepository:
+    return SajuShareRepository(db)
+
+
+SajuShareRepo = Annotated[SajuShareRepository, Depends(get_saju_share_repository)]

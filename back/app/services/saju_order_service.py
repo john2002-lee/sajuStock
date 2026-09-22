@@ -16,10 +16,12 @@
 """
 
 import logging
+from datetime import UTC, datetime
 
 from app.core.config import settings
 from app.core.exceptions import AppError
 from app.domain.saju.followup import MAX_FOLLOW_UPS
+from app.domain.saju_retention import RetentionCutoffs, retention_cutoffs
 from app.integrations.payment.toss import TossPaymentsProvider
 from app.integrations.saju.mapper import to_chart_out, to_luck_out, to_teaser_out
 from app.models.saju_order import SajuOrderRow
@@ -28,15 +30,20 @@ from app.repositories.saju_order import (
     derive_access_token,
     hash_access_token,
     new_order_id,
+    new_report_share_id,
 )
 from app.schemas.saju import (
     BirthInput,
     FollowUpResponse,
+    LuckOut,
     SajuFollowUpState,
     SajuFollowUpTurn,
     SajuOrderCreated,
     SajuPaidReport,
     SajuPaymentConfirmed,
+    SajuShareCreated,
+    SajuSharedReport,
+    SharedChartOut,
 )
 from app.services import saju_service
 
@@ -469,6 +476,95 @@ async def answer_reserved_follow_up(
             logger.warning("추가 질문 실패로 슬롯을 반환했습니다 — 행 %s", follow_up_id)
 
     return outcome.response
+
+
+def _order_cutoffs() -> RetentionCutoffs:
+    """지금 시각 기준의 파기 경계. 파기 배치와 **같은 함수**로 계산한다.
+
+    `saju_purge_service.purge_expired_orders` 가 부르는 것과 인자까지 같다 —
+    공유 링크가 열리는 기간과 데이터가 남는 기간이 한 규칙에서 나와야 한다.
+    """
+    return retention_cutoffs(
+        datetime.now(UTC),
+        retention_days=settings.saju_order_retention_days,
+        legacy_retention_days=settings.saju_order_retention_days_legacy,
+        changed_on=settings.saju_retention_changed_on,
+    )
+
+
+async def share_paid_report(token: str, repo: SajuOrderRepository) -> SajuShareCreated:
+    """구매한 리포트를 **읽기 전용으로 여는 링크**를 낸다. 없으면 만들고, 있으면 그것.
+
+    ## 왜 토큰을 그대로 쓰지 않나
+
+    `/saju/reports/{token}` 은 로그인을 대신하는 자격 증명이다. 받은 사람이 리포트
+    전문과 **양력 생년월일**을 보고 `POST /saju/reports/{token}/follow-ups` 로
+    **구매자의 남은 추가 질문까지 쓴다.** 입력창을 숨긴 페이지를 따로 만들어도
+    주소를 고치면 그만이라 화면으로는 막히지 않는다.
+
+    그래서 두 번째 난수를 낸다. 이 id 로 여는 응답(`SajuSharedReport`)에는 토큰도,
+    생년월일도, 추가 질문도 실리지 않는다.
+
+    ## 리포트가 있어야 발급한다
+
+    아직 만드는 중이면 거절한다. 링크를 먼저 쥐여 주면 **받는 사람에게만 404 인**
+    주소가 나가고, 보낸 쪽은 그 사실을 알 방법이 없다.
+
+    ## 두 번 눌러도 같은 링크
+
+    만료 확인을 하지 않는 것이 `saju_shares` 쪽과 다른 점이다. 이 링크는 주문과
+    **함께** 죽으므로, 주문이 살아 있는 한 id 가 가리키는 것도 살아 있다.
+    """
+    order = await repo.get_by_token_hash(hash_access_token(token))
+    if order is None:
+        raise OrderNotFoundError()
+    if order.status == "needs_attention":
+        raise PaymentNeedsAttentionError()
+    if order.status != "paid":
+        raise ReportNotReadyError()
+
+    if order.report_share_id is None:
+        if await repo.get_report(order.id) is None:
+            raise ReportGeneratingError()
+        await repo.set_report_share_id(order, new_report_share_id())
+
+    return SajuShareCreated(
+        share_id=order.report_share_id or "",
+        retention_days=settings.saju_order_retention_days,
+    )
+
+
+async def read_shared_report(share_id: str, repo: SajuOrderRepository) -> SajuSharedReport:
+    """공유 링크로 리포트를 연다. **소유자를 묻지 않는다** — 링크가 곧 열쇠다.
+
+    없는 링크·만료된 링크·아직 리포트가 없는 주문을 구분하지 않고 셋 다
+    `OrderNotFoundError` 다. 구분해 주면 "있었지만 만료됐다" 가 곧 **그 사람이 이
+    서비스에서 리포트를 샀다는 사실**을 아무에게나 확인해 주는 창구가 된다 —
+    `saju_shares` 의 조회가 같은 이유로 둘을 합쳤다.
+
+    좁히기는 여기서 손으로 하지 않는다. 저장된 값을 `SharedChartOut` 으로
+    `model_validate` 하면 그 타입에 없는 `solar_date` 와 보정 분값이 **구조적으로**
+    떨어진다. 지우는 코드를 적으면 필드가 하나 늘어나는 날 그 코드가 따라가지
+    않지만, 타입은 따라간다.
+    """
+    order = await repo.get_by_report_share_id(share_id, _order_cutoffs())
+    if order is None:
+        raise OrderNotFoundError()
+
+    report = await repo.get_report(order.id)
+    if report is None:
+        raise OrderNotFoundError()
+
+    stored = report.chart or {}
+    return SajuSharedReport(
+        markdown=report.markdown,
+        chart=SharedChartOut.model_validate(stored.get("chart") or {}),
+        luck=LuckOut.model_validate(stored.get("luck") or {}),
+        strength_verdict=str(stored.get("strength_verdict") or ""),
+        source=report.source,  # type: ignore[arg-type]
+        created_at=order.created_at.isoformat(),
+        retention_days=settings.saju_order_retention_days,
+    )
 
 
 async def birth_for_token(token: str, repo: SajuOrderRepository) -> BirthInput:

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { shareLink, shareResultUrl, shareUrl } from "./share.ts";
+import {
+  daysUntilExpiry,
+  shareLink,
+  shareReportUrl,
+  shareResultUrl,
+  shareUrl,
+} from "./share.ts";
 
 /**
  * 여기서 지키는 것은 **취소를 실패로 읽지 않는가** 와 **취소한 사람의 클립보드를
@@ -67,6 +73,41 @@ describe("shareResultUrl", () => {
 });
 
 const TARGET = { url: "https://aiot21.com", title: "FEEL", text: "사주팔자" };
+
+describe("shareReportUrl", () => {
+  test("여덟 글자 공유와 **다른 경로**다 — 담기는 것이 다르면 주소도 달라야 한다", () => {
+    const origin = "https://aiot21.com";
+    const id = "LlfxbdXMbe_2vhUROmOb-g";
+
+    assert.equal(shareReportUrl(origin, id), `${origin}/saju/r/${id}`);
+    assert.notEqual(shareReportUrl(origin, id), shareResultUrl(origin, id));
+  });
+
+  test("id 를 인코딩한다 — 서버가 생성 방식을 바꾸는 날 조용히 깨지지 않게", () => {
+    assert.equal(
+      shareReportUrl("https://aiot21.com", "a/b?c"),
+      "https://aiot21.com/saju/r/a%2Fb%3Fc",
+    );
+  });
+});
+
+describe("daysUntilExpiry", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  test("남은 날을 올림한다 — 내림하면 아직 열리는 링크에 만료라고 적힌다", () => {
+    const created = new Date(Date.now() - 6.5 * DAY).toISOString();
+    assert.equal(daysUntilExpiry(created, 7), 1);
+  });
+
+  test("이미 지난 링크는 0 이다 — 음수가 화면에 나가면 안 된다", () => {
+    const created = new Date(Date.now() - 30 * DAY).toISOString();
+    assert.equal(daysUntilExpiry(created, 7), 0);
+  });
+
+  test("날짜를 못 읽으면 null — 화면이 '일정 기간' 으로 물러설 수 있게", () => {
+    assert.equal(daysUntilExpiry("어제쯤", 7), null);
+  });
+});
 
 describe("shareLink — 공유 시트가 있을 때", () => {
   test("시트를 열고 `shared` 로 끝난다", async () => {

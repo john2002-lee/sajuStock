@@ -1,6 +1,12 @@
 import { apiGet } from "@/lib/api";
 import type { SharedReading } from "../model/types";
-import { toSharedReading, type WireSharedReading } from "./wire";
+import type { SharedReport } from "../model/types";
+import {
+  toSharedReading,
+  toSharedReport,
+  type WireSharedReading,
+  type WireSharedReport,
+} from "./wire";
 
 /**
  * 공유된 사주 조회. **서버에서만 실행된다** (`features/saju/server.ts`).
@@ -35,6 +41,32 @@ export async function getSharedReading(shareId: string): Promise<SharedReading |
     // 없는 링크 · 만료된 링크 · 백엔드 장애를 구분하지 않는다. 화면이 할 수 있는
     // 일이 셋 다 같고(404 를 그린다), 구분해 주면 "있었지만 만료됐다" 가 곧 그
     // 사람이 이 서비스를 썼다는 확인이 된다 — 백엔드도 같은 이유로 합쳤다.
+    return null;
+  }
+}
+
+/**
+ * 공유된 **유료 리포트** 조회. 서버에서만 실행된다.
+ *
+ * 위 `getSharedReading` 과 같은 규칙을 그대로 따른다 — 실패를 `null` 로 접고,
+ * 캐시하지 않는다(만료가 캐시보다 오래 살면 안 된다).
+ *
+ * ## 왜 발급(POST)은 여기 없나
+ *
+ * 발급은 브라우저가 클릭 핸들러 안에서 한다(`ShareButton`). `navigator.share` 는
+ * 사용자 제스처 안에서만 열리므로 서버 컴포넌트가 낄 자리가 없다.
+ */
+export async function getSharedReport(shareId: string): Promise<SharedReport | null> {
+  try {
+    const wire = await apiGet<WireSharedReport>(
+      `/saju/shares/report/${encodeURIComponent(shareId)}`,
+    );
+    if (!wire) return null;
+    return toSharedReport(wire);
+  } catch {
+    // 없는 링크 · 만료된 링크 · 백엔드 장애를 구분하지 않는다. 구분해 주면
+    // "있었지만 만료됐다" 가 곧 그 사람이 리포트를 샀다는 확인이 된다 —
+    // 백엔드도 같은 이유로 셋을 하나의 404 로 합쳤다.
     return null;
   }
 }

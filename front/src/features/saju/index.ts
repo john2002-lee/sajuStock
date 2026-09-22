@@ -33,6 +33,7 @@ export { PillToggle, type PillToggleProps } from "./components/PillToggle";
 export { BirthForm, type BirthFormProps, type BirthFormValues } from "./components/BirthForm";
 export { TeaserView, StartOverPrompt, type TeaserViewProps } from "./components/TeaserView";
 export { SharedReadingView } from "./components/SharedReadingView";
+export { SharedReportView } from "./components/SharedReportView";
 export { WebtoonReport, type WebtoonReportProps } from "./components/WebtoonReport";
 export { LuckPanel, PillarsPanel, WuxingPanel } from "./components/ChartPanels";
 export { FollowUpChat, type ChatTurn, type FollowUpTarget } from "./components/FollowUpChat";
@@ -48,7 +49,9 @@ export {
   type StoredReading,
 } from "./model/storage";
 export {
+  daysUntilExpiry,
   shareLink,
+  shareReportUrl,
   shareUrl,
   type ShareCapabilities,
   type ShareOutcome,

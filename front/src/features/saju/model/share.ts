@@ -104,6 +104,36 @@ export function shareResultUrl(origin: string, shareId: string): string {
 }
 
 /**
+ * 공유된 리포트를 여는 주소의 경로. `SHARE_PATH` 와 나란히 둔다 — 화면 링크 ·
+ * `robots.ts` 의 차단 목록 · 분석 마스킹이 같은 문자열을 말해야 한다.
+ *
+ * **여덟 글자 공유(`/saju/s`)와 주소가 다른 것이 의도다.** 담기는 것이 다르므로
+ * (이쪽은 리포트 본문이 나간다) 로그·차단 목록에서 둘을 구분할 수 있어야 한다.
+ */
+export const SHARE_REPORT_PATH = "/saju/r";
+
+/** 발급받은 리포트 공유 id 로 친구에게 보낼 주소를 만든다. */
+export function shareReportUrl(origin: string, shareId: string): string {
+  return `${origin}${SHARE_REPORT_PATH}/${encodeURIComponent(shareId)}`;
+}
+
+/**
+ * 링크가 며칠 남았나. 만료된 링크는 `0`, 날짜를 못 읽으면 `null`.
+ *
+ * **두 공유 화면이 나눠 쓴다.** 같은 계산을 두 벌 두면 한쪽만 고쳐지는 날 두
+ * 화면이 다른 날짜를 말하고, 링크를 받은 사람은 어느 쪽을 믿을지 알 수 없다.
+ *
+ * 올림이다 — "0.3일 남았다" 를 "0일" 로 내리면 아직 열리는 링크에 만료라고
+ * 적히고, 그쪽으로 틀리면 받은 사람이 열어 보지도 않는다.
+ */
+export function daysUntilExpiry(createdAt: string, retentionDays: number): number | null {
+  const created = Date.parse(createdAt);
+  if (Number.isNaN(created)) return null;
+  const expires = created + retentionDays * 24 * 60 * 60 * 1000;
+  return Math.max(0, Math.ceil((expires - Date.now()) / (24 * 60 * 60 * 1000)));
+}
+
+/**
  * 공유 시트를 열고, 없으면 복사한다.
  *
  * 순서가 중요하다 — 시트가 있으면 시트가 낫다. 복사는 "붙여 넣을 곳" 을 사용자가

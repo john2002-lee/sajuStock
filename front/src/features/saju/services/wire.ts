@@ -13,11 +13,13 @@ import type {
   Luck,
   PillarDetail,
   ProfileDraft,
+  ReportChart,
   SajuChart,
   SajuReading,
   SajuReport,
   SeUn,
   SharedReading,
+  SharedReport,
   Strength,
   StrengthVerdict,
   Teaser,
@@ -119,6 +121,34 @@ export interface WireShareCreated {
   retention_days: number;
 }
 
+/**
+ * 공유된 리포트 응답. **`WireChart` 를 재사용하지 않는다.**
+ *
+ * 저쪽에는 `solar_date` 와 보정 분값 둘이 있다. 서버는 이 경로에서 그 셋을 내려
+ * 주지 않으므로(`SajuSharedReport`), 같은 타입을 쓰면 **오지 않는 값을 온다고
+ * 적어 둔 것**이 된다. 타입이 응답과 다르면 다음 사람이 그 값을 읽으려 든다.
+ */
+export interface WireSharedChart {
+  year: WirePillarDetail;
+  month: WirePillarDetail;
+  day: WirePillarDetail;
+  hour: WirePillarDetail | null;
+  day_master: string;
+  day_master_hangul: string;
+  visible_wuxing: Record<string, number>;
+  /** 서버는 관례도 함께 내리지만(보정 분값은 빼고) 화면이 읽지 않아 매핑하지 않는다. */
+}
+
+export interface WireSharedReport {
+  markdown: string;
+  chart: WireSharedChart;
+  luck: WireLuck;
+  strength_verdict: string;
+  source: "llm" | "fallback";
+  created_at: string;
+  retention_days: number;
+}
+
 export interface WireSharedReading {
   pillars_hangul: string[];
   day_master_hangul: string;
@@ -150,6 +180,34 @@ function toConventions(wire: WireChart["conventions"]): Conventions {
     dstApplied: wire.dst_applied,
     longitudeCorrectionMinutes: wire.longitude_correction_minutes,
     equationOfTimeMinutes: wire.equation_of_time_minutes,
+  };
+}
+
+/**
+ * 좁혀 받은 원국 → 화면 타입. `toChart` 와 달리 `solarDate`·`conventions` 가 없다 —
+ * 애초에 오지 않기 때문이고, 그것이 이 함수가 따로 있는 이유다.
+ */
+export function toReportChart(wire: WireSharedChart): ReportChart {
+  return {
+    year: toPillar(wire.year),
+    month: toPillar(wire.month),
+    day: toPillar(wire.day),
+    hour: wire.hour ? toPillar(wire.hour) : null,
+    dayMaster: wire.day_master,
+    dayMasterHangul: wire.day_master_hangul,
+    visibleWuxing: wire.visible_wuxing,
+  };
+}
+
+export function toSharedReport(wire: WireSharedReport): SharedReport {
+  return {
+    markdown: wire.markdown,
+    chart: toReportChart(wire.chart),
+    luck: toLuck(wire.luck),
+    strengthVerdict: wire.strength_verdict,
+    source: wire.source,
+    createdAt: wire.created_at,
+    retentionDays: wire.retention_days,
   };
 }
 

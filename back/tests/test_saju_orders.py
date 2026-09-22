@@ -13,6 +13,7 @@ DB 를 띄우지 않는다. 저장소를 가짜로 두면 검사하려는 **분�
 
 import asyncio
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -23,11 +24,14 @@ from app.schemas.saju import BirthInput
 from app.services import saju_job_store, saju_order_service
 from app.services.saju_order_service import (
     NoFollowUpSlotsError,
+    OrderNotFoundError,
     PaymentNeedsAttentionError,
     ReportGeneratingError,
     ReportNotReadyError,
     confirm_payment,
     read_paid_report,
+    read_shared_report,
+    share_paid_report,
 )
 
 BIRTH = BirthInput(
@@ -47,15 +51,30 @@ BIRTH = BirthInput(
 # ---------------------------------------------------------------------------
 
 
+#: 주문을 만들 때 서버가 계산해 넣어 두는 값(`create_order`). 유료 결과 공유가
+#: **재계산 없이** 옮기는 것이 정확히 이것이라, 테스트도 그 자리에서 가져온다.
+TEASER = {
+    "pillars_hangul": ["경오", "신사", "임진", "정미"],
+    "char_count": 8,
+    "day_master_hangul": "임",
+    "visible_wuxing": {"목": 0, "화": 3, "토": 2, "금": 2, "수": 1},
+    "strength_verdict": "신약",
+    "summary": "여덟 글자 요약 한 문단.",
+}
+
+
 @dataclass
 class FakeOrder:
     id: str = "order-1"
     birth: dict[str, Any] = field(default_factory=lambda: BIRTH.model_dump(mode="json"))
+    teaser: dict[str, Any] = field(default_factory=lambda: dict(TEASER))
     amount: int = 9900
     status: str = "pending"
     idempotency_key: str = "idem-1"
     payment_key: str | None = None
     attention_reason: str | None = None
+    report_share_id: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -82,6 +101,7 @@ class FakeRepo:
         self.saved: list[dict[str, Any]] = []
         self.marked_paid = 0
         self.attention: list[str] = []
+        self.share_ids_written: list[str] = []
         self.follow_ups: list[FakeFollowUp] = []
         self._next_follow_up_id = 1
 
@@ -104,6 +124,16 @@ class FakeRepo:
         self.attention.append(reason)
         order.status = "needs_attention"
         return order
+
+    async def set_report_share_id(self, order, share_id: str):
+        self.share_ids_written.append(share_id)
+        order.report_share_id = share_id
+        return order
+
+    async def get_by_report_share_id(self, share_id: str, _cutoffs):
+        if self.order is None or self.order.report_share_id != share_id:
+            return None
+        return self.order
 
     async def save_report(self, *, order_id, markdown, chart, source):
         self.saved.append({"order_id": order_id, "markdown": markdown, "source": source})
@@ -573,3 +603,160 @@ def _patch_outcome(monkeypatch, repo: FakeRepo, *, kind: str, answer: str) -> No
     import app.core.database as database
 
     monkeypatch.setattr(database, "AsyncSessionLocal", lambda: _NullSession())
+
+
+# ---------------------------------------------------------------------------
+# 유료 리포트 공유 — `POST /saju/shares/from-report` · `GET /saju/shares/report/{id}`
+#
+# 이 절이 지키는 것은 셋이다.
+#
+#   ① **접근 토큰이 링크가 되지 않는다.** 그 토큰은 로그인을 대신하는 자격
+#      증명이라, 받은 사람이 양력 생년월일을 보고 구매자의 남은 추가 질문까지
+#      쓴다. 공유 id 는 토큰과 무관한 두 번째 난수여야 한다.
+#   ② **응답이 좁혀져 있는가.** 화면에서 감추는 것은 UI 일 뿐이다 — 새는지
+#      아닌지는 응답이 정한다.
+#   ③ **결제된, 리포트가 있는 주문만.** 링크를 먼저 쥐여 주면 받는 쪽에만 404 인
+#      주소가 나가고 보낸 쪽은 그것을 알 수 없다.
+# ---------------------------------------------------------------------------
+
+#: 저장된 리포트의 `chart` 칸을 **실제 매퍼로** 짓는다. 손으로 적으면 매퍼에
+#: 필드가 하나 느는 날 이 테스트만 옛 모양을 검사하며 통과한다 — 새는지 보는
+#: 테스트가 그러면 아무것도 안 지킨다.
+def _stored_chart() -> dict[str, Any]:
+    from app.integrations.saju.mapper import to_chart_out, to_luck_out
+    from app.services import saju_service
+
+    reading = saju_service.read_chart(BIRTH)
+    return {
+        "chart": to_chart_out(reading.chart).model_dump(mode="json"),
+        "luck": to_luck_out(reading.luck).model_dump(mode="json"),
+        "strength_verdict": reading.strength.verdict,
+    }
+
+
+class TestSharePaidReport:
+    @pytest.mark.asyncio
+    async def test_mints_an_id_that_is_not_the_access_token(self):
+        """**이 테스트가 이 기능의 존재 이유다.**
+
+        토큰을 그대로 쓰거나 그것에서 파생시키면, 받은 사람이 되돌려 원래 화면으로
+        갈 수 있다. 공유 id 는 토큰과 아무 관계가 없어야 한다.
+        """
+        orders = FakeRepo(FakeOrder(status="paid"), report=FakeReport())
+
+        result = await share_paid_report("token", orders)
+
+        assert result.share_id
+        assert result.share_id != "token"
+        assert "token" not in result.share_id
+        assert orders.order.report_share_id == result.share_id
+
+    @pytest.mark.asyncio
+    async def test_second_click_returns_the_same_link(self):
+        """누를 때마다 새로 내면 먼저 보낸 링크가 말없이 죽는다."""
+        orders = FakeRepo(FakeOrder(status="paid"), report=FakeReport())
+
+        first = await share_paid_report("token", orders)
+        second = await share_paid_report("token", orders)
+
+        assert first.share_id == second.share_id
+        assert len(orders.share_ids_written) == 1
+
+    @pytest.mark.asyncio
+    async def test_report_still_generating_cannot_be_shared(self):
+        """링크를 먼저 쥐여 주면 **받는 사람에게만 404 인** 주소가 나간다."""
+        orders = FakeRepo(FakeOrder(status="paid"), report=None)
+
+        with pytest.raises(ReportGeneratingError):
+            await share_paid_report("token", orders)
+
+        assert orders.order.report_share_id is None
+
+    @pytest.mark.asyncio
+    async def test_unpaid_order_cannot_mint(self):
+        orders = FakeRepo(FakeOrder(status="pending"), report=FakeReport())
+
+        with pytest.raises(ReportNotReadyError):
+            await share_paid_report("token", orders)
+
+    @pytest.mark.asyncio
+    async def test_needs_attention_order_cannot_mint(self):
+        orders = FakeRepo(FakeOrder(status="needs_attention"), report=FakeReport())
+
+        with pytest.raises(PaymentNeedsAttentionError) as exc:
+            await share_paid_report("token", orders)
+
+        assert exc.value.code == "saju_payment_needs_attention"
+
+    @pytest.mark.asyncio
+    async def test_unknown_token_is_not_found(self):
+        with pytest.raises(OrderNotFoundError):
+            await share_paid_report("token", FakeRepo(None))
+
+
+#: 줄바꿈이 든 본문. 마크다운이 저장된 그대로 건너가는지 보는 것이 요점이다.
+MARKDOWN = "# 총평" + chr(10) + "됐네"
+
+
+class TestReadSharedReport:
+    @pytest.mark.asyncio
+    async def test_body_and_panels_come_through(self):
+        """공유의 값어치는 리포트 본문과 계산 패널이다. 그것이 나가야 한다."""
+        stored = _stored_chart()
+        orders = FakeRepo(
+            FakeOrder(status="paid", report_share_id="shr"),
+            report=FakeReport(markdown=MARKDOWN, chart=stored),
+        )
+
+        shared = await read_shared_report("shr", orders)
+
+        assert shared.markdown == MARKDOWN
+        assert shared.chart.day_master_hangul
+        assert shared.luck.da_yun
+        assert shared.strength_verdict == stored["strength_verdict"]
+
+    @pytest.mark.asyncio
+    async def test_birth_identifying_fields_are_structurally_dropped(self):
+        """**응답에 생년월일로 이어지는 칸이 하나도 없어야 한다.**
+
+        `solar_date` 한 칸이 곧 생년월일이고, 진태양시 보정 분값 둘의 조합은
+        출생지 경도를 좁힌다. 저장된 리포트에는 그 셋이 **다 들어 있다** — 아래
+        `assert` 들이 그것을 먼저 확인한다. 응답에서 사라지는 것은 지우는 코드가
+        아니라 `SharedChartOut` 이라는 타입 때문이다.
+        """
+        stored = _stored_chart()
+        assert stored["chart"]["solar_date"]
+        assert "longitude_correction_minutes" in stored["chart"]["conventions"]
+
+        orders = FakeRepo(
+            FakeOrder(status="paid", report_share_id="shr"),
+            report=FakeReport(chart=stored),
+        )
+
+        shared = await read_shared_report("shr", orders)
+        raw = shared.model_dump_json()
+
+        assert "solar_date" not in raw
+        assert "longitude_correction_minutes" not in raw
+        assert "equation_of_time_minutes" not in raw
+        assert "access_token" not in raw
+        assert "follow_up" not in raw
+        # 값으로도 새지 않는지 — 키 검사만으로는 중첩된 것을 못 잡는다.
+        assert "1990-05-15" not in raw
+
+    @pytest.mark.asyncio
+    async def test_unknown_id_is_not_found(self):
+        orders = FakeRepo(
+            FakeOrder(status="paid", report_share_id="shr"), report=FakeReport()
+        )
+
+        with pytest.raises(OrderNotFoundError):
+            await read_shared_report("someone-elses-id", orders)
+
+    @pytest.mark.asyncio
+    async def test_expired_or_missing_report_is_the_same_404(self):
+        """만료와 없음을 구분하지 않는다 — 구분은 곧 "이 사람이 샀다" 의 확인이다."""
+        orders = FakeRepo(FakeOrder(status="paid", report_share_id="shr"), report=None)
+
+        with pytest.raises(OrderNotFoundError):
+            await read_shared_report("shr", orders)

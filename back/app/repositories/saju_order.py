@@ -38,6 +38,41 @@ def hash_access_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _expired(cutoffs: RetentionCutoffs):
+    """보관 기간이 지난 주문을 고르는 술어.
+
+    경계가 둘인 이유는 `domain/saju_retention` 에 있다 — 보관 기간을 줄이기 전에
+    팔린 주문에는 그때의 약속(더 긴 기간)이 걸린다.
+
+    **파기와 공유 링크 조회가 이것 하나를 나눠 쓴다.** 두 곳에 따로 적으면 한쪽만
+    고쳐지는 날 링크의 수명과 데이터의 수명이 어긋나고, 그 어긋남은 "이미 파기한
+    리포트가 아직 링크로 열린다" 쪽으로 틀릴 수 있다.
+    """
+    return or_(
+        and_(
+            SajuOrderRow.created_at < cutoffs.changed_at,
+            SajuOrderRow.created_at < cutoffs.legacy,
+        ),
+        and_(
+            SajuOrderRow.created_at >= cutoffs.changed_at,
+            SajuOrderRow.created_at < cutoffs.current,
+        ),
+    )
+
+
+def new_report_share_id() -> str:
+    """리포트 공유 주소의 id. `secrets.token_urlsafe(16)` = 128비트, 22자.
+
+    **접근 토큰과 독립이다.** 토큰에서 파생시키면(해시 한 번이라도) 둘의 수명이
+    묶이고, 무엇보다 공유를 취소할 방법이 사라진다 — 지금 그 화면은 없지만, 이
+    칸을 널로 되돌리는 것만으로 되게 남겨 둔다.
+
+    폭은 `saju_shares.share_id` 와 같다. 주소가 곧 열쇠이므로 짧게 하면 남의
+    링크를 긁어 볼 수 있다.
+    """
+    return secrets.token_urlsafe(16)
+
+
 class SajuOrderRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
@@ -97,6 +132,37 @@ class SajuOrderRepository:
         await self._db.commit()
         await self._db.refresh(row)
         return row
+
+    async def set_report_share_id(self, row: SajuOrderRow, share_id: str) -> SajuOrderRow:
+        """이 리포트를 읽기 전용으로 여는 공유 id 를 기억한다.
+
+        두 번 눌러도 같은 링크가 나가게 하는 것이 전부다. 덮어쓰지 않는다 —
+        부르는 쪽(`share_paid_report`)이 이미 있으면 그것을 돌려주므로 여기까지
+        오지 않는다. 덮어쓰면 **먼저 보낸 링크가 말없이 죽는다.**
+        """
+        row.report_share_id = share_id
+        await self._db.commit()
+        await self._db.refresh(row)
+        return row
+
+    async def get_by_report_share_id(
+        self, share_id: str, cutoffs: RetentionCutoffs
+    ) -> SajuOrderRow | None:
+        """공유 id 로 주문 하나. **만료를 쿼리가 강제한다.**
+
+        삭제를 기다리지 않는 이유: `saju_purge_service` 는 크론이 아니라 요청
+        경로에 얹혀 도는 기회주의적 정리다. 트래픽이 없으면 돌지 않고, 그러면
+        "지웠다" 고 적어 둔 날짜가 지난 링크가 계속 열린다. 공유 링크에서 그
+        차이는 치명적이다 — `SajuShareRepository.get` 이 같은 판단을 했다.
+
+        경계가 여기서 `delete_expired` 와 **같은 술어**인 것이 요점이다. 둘을
+        따로 적으면 한쪽만 고쳐지는 날 링크의 수명과 데이터의 수명이 어긋난다.
+        """
+        stmt = select(SajuOrderRow).where(
+            SajuOrderRow.report_share_id == share_id,
+            ~_expired(cutoffs),
+        )
+        return (await self._db.execute(stmt)).scalar_one_or_none()
 
     async def get_report(self, order_id: str) -> SajuReportRow | None:
         stmt = select(SajuReportRow).where(SajuReportRow.order_id == order_id)
@@ -239,18 +305,6 @@ class SajuOrderRepository:
         지운 수를 세는 이유는 관리자 화면이 "정말 지워지고 있나" 에 답해야
         하기 때문이다. 파기는 안 돌아도 화면이 멀쩡한 종류라 숫자가 유일한 증거다.
         """
-        # 경계가 둘인 이유는 `domain/saju_retention` 에 있다 — 보관 기간을
-        # 줄이기 전에 팔린 주문에는 그때의 약속(더 긴 기간)이 걸린다.
-        expired = or_(
-            and_(
-                SajuOrderRow.created_at < cutoffs.changed_at,
-                SajuOrderRow.created_at < cutoffs.legacy,
-            ),
-            and_(
-                SajuOrderRow.created_at >= cutoffs.changed_at,
-                SajuOrderRow.created_at < cutoffs.current,
-            ),
-        )
-        result = await self._db.execute(delete(SajuOrderRow).where(expired))
+        result = await self._db.execute(delete(SajuOrderRow).where(_expired(cutoffs)))
         await self._db.commit()
         return result.rowcount or 0

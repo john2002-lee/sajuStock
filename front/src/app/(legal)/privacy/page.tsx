@@ -24,6 +24,14 @@ import { DocHeading, Section } from "../_components/Section";
  *  - **유료 경로 수집 항목** — `models/saju_order.SajuOrderRow` 가 생년월일시를
  *    JSONB 로 보관하고 `SajuReportRow` 가 리포트 본문을 보관한다. 계정을 요구하지
  *    않으므로 이 둘이 사주 쪽에서 저장되는 전부다.
+ *  - **유료 리포트 공유** — `POST /saju/shares/from-report` 가
+ *    `SajuOrderRow.report_share_id` 에 난수를 하나 적고, `/saju/r/{id}` 가 그
+ *    id 로 리포트를 **읽기 전용으로** 연다. 본문을 복사해 두지 않으므로 주문이
+ *    파기되면 링크도 함께 죽는다. 응답은 `SajuSharedReport` 로 좁혀진다 —
+ *    양력 생년월일·진태양시 보정 분값·추가 질문·접근 토큰이 들어가지 않는다.
+ *    **공유되는 주소는 `/saju/reports/{token}` 이 아니다**: 그 토큰은 전체 접근
+ *    자격 증명이라, 받은 사람이 생년월일을 보고 구매자의 남은 추가 질문까지 쓸 수
+ *    있다.
  *  - **계정 항목** — 이메일·이름·비밀번호 해시·인증 시각(`lib/auth/accounts.ts` 의
  *    `users` 테이블). **일반 가입은 없다** — `auth.ts` 의 `signIn` 콜백이 관리자가
  *    아닌 계정을 문턱에서 돌려보내므로, 계정은 운영자용으로만 존재한다. 그래서
@@ -117,6 +125,20 @@ export default function PrivacyPolicyPage() {
           구매 후 리포트 주소를 저장해 두시면 다시 보실 수 있도록 보관하며, 주문
           생성일로부터 <strong className="font-semibold text-ink">{RETENTION_DAYS}일</strong>{" "}
           후 파기합니다.
+        </p>
+        <p>
+          구매하신 리포트 화면에서{" "}
+          <strong className="font-semibold text-ink">공유 링크를 만드실 때</strong>에는,
+          받으신 분이 <strong className="font-semibold text-ink">리포트 본문과 사주 계산
+          결과를 읽을 수 있는</strong> 별도의 주소가 만들어집니다. 이 주소는 구매하신
+          리포트 주소와 다르며,{" "}
+          <strong className="font-semibold text-ink">
+            생년월일시·추가 질문 내용은 이 주소로 전달되지 않고, 받으신 분이 추가 질문을
+            하실 수도 없습니다.
+          </strong>{" "}
+          공유 링크는 위 주문 보관 기간이 끝나면 함께 열람이 차단됩니다. 링크를 아는
+          사람이면 누구나 열 수 있으므로 원하지 않는 상대에게 전달되지 않도록 유의하시기
+          바랍니다.
         </p>
         <p>
           추가 질문의 자유 입력란에는 이름·연락처·주민등록번호·건강 상태 등 민감한 내용을

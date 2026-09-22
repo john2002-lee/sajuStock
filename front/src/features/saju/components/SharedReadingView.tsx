@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { daysUntilExpiry } from "../model/share";
 import type { SharedReading } from "../model/types";
 import { WUXING_KEYS } from "../model/types";
 import { WUXING_LABEL, ganWuxingOf, wuxingClass, zhiWuxingOf } from "../model/wuxing";
@@ -97,16 +98,9 @@ function WuxingBars({ visibleWuxing }: { visibleWuxing: Record<string, number> }
   );
 }
 
-/** 며칠 남았나. 0 이하면 이 화면은 애초에 안 열린다(서버가 404 를 낸다). */
-function daysLeft(createdAt: string, retentionDays: number): number | null {
-  const created = Date.parse(createdAt);
-  if (Number.isNaN(created)) return null;
-  const expires = created + retentionDays * 24 * 60 * 60 * 1000;
-  return Math.max(0, Math.ceil((expires - Date.now()) / (24 * 60 * 60 * 1000)));
-}
-
 export function SharedReadingView({ reading }: { reading: SharedReading }) {
-  const left = daysLeft(reading.createdAt, reading.retentionDays);
+  // 계산은 `model/share.ts` 에 있다 — 리포트 공유 화면과 같은 날짜를 말해야 한다.
+  const left = daysUntilExpiry(reading.createdAt, reading.retentionDays);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">

@@ -64,6 +64,30 @@ class SajuOrderRow(TimestampMixin, Base):
     #: 해시만 두어도 잃는 것이 없다.
     access_token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
 
+    #: 이 리포트를 **읽기 전용으로 여는 공유 주소**의 id. 널이면 아직 공유하지
+    #: 않았다 — 버튼을 눌렀을 때만 채워진다.
+    #:
+    #: ## 왜 `access_token_hash` 로 대신할 수 없나
+    #:
+    #: 토큰이 곧 자격 증명이라, 그 주소를 받은 사람은 리포트 전문과 **양력
+    #: 생년월일**을 보고 `POST /saju/reports/{token}/follow-ups` 로 **구매자의 남은
+    #: 추가 질문까지 쓴다.** 화면에서 입력창을 숨겨도 주소를 고치면 그만이라 UI 로는
+    #: 막을 수 없다. 그래서 **토큰과 무관한 두 번째 난수**가 필요하다.
+    #:
+    #: 이 id 로 여는 응답은 `SajuSharedReport` 로 좁혀진다 — 생년월일·보정 분값·
+    #: 추가 질문이 구조적으로 실리지 않는다.
+    #:
+    #: ## 왜 표가 아니라 칸인가
+    #:
+    #: 리포트 본문은 이미 `saju_reports` 에 있다. 복사해 두면 원본과 사본이 갈라지고
+    #: 보관 기간이 둘이 된다. 이 칸은 **그 행을 여는 두 번째 열쇠**일 뿐이라,
+    #: 주문이 지워지면 링크도 함께 죽는다 — 구매자 자신의 접근이 끝나는 바로 그
+    #: 순간이다. 링크가 그보다 오래 사는 경로가 없다.
+    #:
+    #: 공유한 뒤 취소할 수 있게 하려면 이 칸을 다시 널로 만들면 된다. 지금 그 화면은
+    #: 없다.
+    report_share_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
     report: Mapped["SajuReportRow | None"] = relationship(
         back_populates="order", uselist=False, cascade="all, delete-orphan"
     )

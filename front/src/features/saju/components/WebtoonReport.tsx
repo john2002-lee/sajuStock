@@ -3,7 +3,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
-import type { Luck, SajuChart } from "../model/types";
+import type { Luck, ReportChart } from "../model/types";
 import { toBeats } from "../model/beats";
 import { extractPreamble, splitSections } from "../model/sections";
 import { ConventionNotice } from "./ConventionNotice";
@@ -26,6 +26,13 @@ import { Shaman } from "./Shaman";
  *
  * 추가 질문(`FollowUpChat`)이 스크롤을 닫는다 — 그녀의 마지막 대사 뒤, 잔글씨 앞.
  * 같은 인물이 계속 말하는 것이므로 별도 화면이나 탭이 아니라 이 스택의 일부다.
+ *
+ * ## 읽기 전용으로도 쓰인다
+ *
+ * `followUp` 과 `share` 는 **슬롯**이라, 넘기지 않으면 그리지 않는다. 공유된
+ * 리포트 화면(`SharedReportView`)이 정확히 그 상태로 이 컴포넌트를 쓴다 —
+ * 본문과 패널은 같고, 질문 입력창과 공유 버튼만 없다. 읽기 전용 사본을 따로
+ * 만들지 않은 이유가 그것이다: 두 벌이 되면 한쪽만 고쳐지는 날이 온다.
  */
 
 /**
@@ -61,7 +68,12 @@ const PANEL_BEFORE: Record<string, "wuxing" | "luck"> = {
 
 export interface WebtoonReportProps {
   markdown: string;
-  chart: SajuChart;
+  /**
+   * 그릴 원국. **좁은 타입인 것이 의도다** — 생년월일(`solarDate`)과 보정 분값이
+   * 여기 들어올 수 없으므로, 공유 화면이 받지 않은 값을 이 컴포넌트가 실수로
+   * 그리는 일이 없다. 전체 `SajuChart` 는 그대로 대입된다.
+   */
+  chart: ReportChart;
   luck: Luck;
   /** 강약 판정. 오행 패널이 한 줄로 인용한다. */
   strengthVerdict: string;
@@ -75,16 +87,14 @@ export interface WebtoonReportProps {
    */
   followUp?: ReactNode;
   /**
-   * 공유 버튼. **호출부가 넘긴다** — `followUp` 과 같은 이유이고, 그 이유가 여기서
-   * 더 날카롭다.
+   * 공유 버튼. **호출부가 넘긴다** — `followUp` 과 같은 이유다.
    *
-   * 결과 링크를 발급하려면 **생년월일시**가 필요하다. 무료 경로는 그것을 들고 있고
-   * (`stored.birth`) 유료 경로는 토큰만 든다. 이 컴포넌트가 버튼을 직접 그리면 두
-   * 화면 중 하나는 반드시 틀린 것을 보낸다.
+   * 발급 재료가 화면마다 다르다: 무료 경로는 생년월일시를 들고 있고(`stored.birth`)
+   * 유료 경로는 접근 토큰을 든다. 이 컴포넌트가 버튼을 직접 그리면 두 화면 중
+   * 하나는 반드시 틀린 것을 보낸다.
    *
-   * 그리고 이 슬롯이 **`/saju/reports/{token}` 이 공유될 수 없게 만드는 장치**이기도
-   * 하다 — 여기에 토큰이 들어올 길이 없으므로, 전체 접근 자격증명이 실수로 공유
-   * 주소가 되는 일이 구조적으로 불가능하다.
+   * 공유된 리포트 화면(`/saju/r/{id}`)은 이 슬롯을 **비운다.** 받은 사람이 남의
+   * 리포트를 다시 공유하는 것은 보낸 사람이 동의한 적 없는 일이다.
    */
   share?: ReactNode;
 }

@@ -80,6 +80,19 @@ export interface SajuChart {
   conventions: Conventions;
 }
 
+/**
+ * 리포트 화면이 **실제로 그리는** 원국.
+ *
+ * `solarDate`(그 한 칸이 곧 생년월일)와 `conventions`(보정 분값 둘의 조합이 곧
+ * 출생지 경도)가 빠져 있다. 어느 패널도 그 둘을 읽지 않으므로 잃는 것이 없고,
+ * 대신 **공유 화면이 그 값을 받지 않았다는 사실이 타입으로 증명된다** — 리포트
+ * 공유(`/saju/r/{id}`)가 좁힌 응답만 들고도 같은 컴포넌트를 쓸 수 있는 이유다.
+ *
+ * 전체 `SajuChart` 는 이 타입에 그대로 대입된다. 그래서 유료·무료 화면은 아무것도
+ * 바꾸지 않아도 된다.
+ */
+export type ReportChart = Omit<SajuChart, "solarDate" | "conventions">;
+
 export interface StrengthBasis {
   deukRyeong: boolean;
   deukJi: boolean;
@@ -121,6 +134,29 @@ export interface SharedReading {
   strengthVerdict: StrengthVerdict;
   summary: string;
   /** ISO 문자열. 화면이 "N일 후 만료" 를 계산하는 기준. */
+  createdAt: string;
+  /** 서버가 정한 보관 기간(일). 화면에 상수로 두지 않는다. */
+  retentionDays: number;
+}
+
+/**
+ * 공유된 유료 리포트 — 링크(`/saju/r/{id}`)를 받은 사람이 보는 것.
+ *
+ * `chart` 가 `ReportChart` 인 것이 요점이다. 서버가 `solar_date` 와 보정 분값을
+ * 아예 내려주지 않으므로(`SajuSharedReport`), **이 화면은 그 값을 그리고 싶어도
+ * 그릴 수 없다.** 좁히기가 타입으로 남는다.
+ *
+ * 추가 질문도 담기지 않는다 — 구매자가 자기 사정을 적은 자유 텍스트이고, 리포트를
+ * 보낼 뜻이 있다고 그것까지 보낼 뜻은 아니다.
+ */
+export interface SharedReport {
+  markdown: string;
+  chart: ReportChart;
+  luck: Luck;
+  strengthVerdict: string;
+  /** `fallback` 이면 LLM 없이 만든 간이 리포트다. 배지가 이 값으로 켜진다. */
+  source: "llm" | "fallback";
+  /** ISO 문자열. 화면이 "N일 후 만료" 를 계산하는 기준(주문 생성 시각). */
   createdAt: string;
   /** 서버가 정한 보관 기간(일). 화면에 상수로 두지 않는다. */
   retentionDays: number;

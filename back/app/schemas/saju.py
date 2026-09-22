@@ -503,6 +503,96 @@ class SajuShareRequest(BaseModel):
     birth: BirthInput
 
 
+class SajuShareFromReportRequest(BaseModel):
+    """구매한 리포트의 **읽기 전용 공유 링크** 발급 요청. 접근 토큰만 받는다.
+
+    ## 이 토큰이 공유 주소가 되는 것이 아니다
+
+    `/saju/reports/{token}` 은 로그인을 대신하는 자격 증명이다. 그 주소를 받은
+    사람은 리포트 전문과 **양력 생년월일**을 보고, `POST /saju/reports/{token}
+    /follow-ups` 로 **구매자의 남은 추가 질문까지 쓸 수 있다.**
+
+    화면에서 입력창만 숨긴 페이지를 따로 만드는 것으로는 막히지 않는다 — 받은
+    사람이 주소를 고치면 원래 화면으로 간다. 그래서 토큰과 무관한 **두 번째
+    난수**를 발급하고(`saju_orders.report_share_id`), 그 id 로 여는 응답을
+    `SajuSharedReport` 로 좁힌다.
+
+    토큰은 "이 리포트의 주인이 맞는가" 를 묻는 데만 쓰이고 응답에 실리지 않는다.
+    """
+
+    access_token: str
+
+
+class SharedConventionsOut(BaseModel):
+    """공유 화면이 보는 계산 관례. **보정 분값 둘이 빠져 있다.**
+
+    `longitude_correction_minutes` 와 `equation_of_time_minutes` 의 조합은 출생지
+    경도를 좁힌다 — `models/saju_share.py` 가 그 둘을 공유 표에서 뺀 이유와 같다.
+    화면이 그 값을 그리지도 않으므로 잃는 것이 없다(`ConventionNotice` 는 인자를
+    받지 않는다).
+    """
+
+    zi_hour_sect: int
+    strength_algorithm_version: str
+    standard_meridian: float
+    dst_applied: bool
+
+
+class SharedChartOut(BaseModel):
+    """공유 화면이 보는 원국. **`solar_date` 가 빠져 있다 — 그 한 칸이 곧 생년월일이다.**
+
+    `ChartOut` 을 재사용하지 않는 것이 이 타입의 전부다. 저장된 리포트에서
+    `model_validate` 로 지으면 없는 필드는 **구조적으로** 떨어져 나간다 — 좁히기가
+    "지우는 것을 잊지 않는다" 는 약속이 아니라 타입 시스템의 사실이 된다.
+    `SajuSharedReading` 이 `TeaserOut` 을 재사용하지 않는 것과 같은 판단이다.
+    """
+
+    year: PillarDetailOut
+    month: PillarDetailOut
+    day: PillarDetailOut
+    hour: PillarDetailOut | None = None
+    day_master: str
+    day_master_hangul: str
+    visible_wuxing: dict[str, int]
+    conventions: SharedConventionsOut
+
+
+class SajuSharedReport(BaseModel):
+    """공유 링크를 연 사람이 보는 리포트. **인증 없이 나가는 응답이다.**
+
+    ## 무엇이 빠졌나, 그리고 왜
+
+    `solar_date` — 그 한 칸이 곧 생년월일이다 (`SharedChartOut`).
+    보정 분값 둘 — 조합이 곧 출생지 경도다 (`SharedConventionsOut`).
+    `follow_ups` — 구매자가 자기 사정을 적은 자유 텍스트다. 리포트 본문은 보낼
+      뜻이 있어 보내는 것이지만, 추가 질문까지 보낼 뜻은 없다.
+    `access_token` — **이것이 실리면 이 타입의 존재 이유가 사라진다.** 받은 사람이
+      곧바로 원래 화면으로 가서 남은 질문을 쓸 수 있다.
+
+    ## 무엇이 남았나
+
+    리포트 본문과 계산 패널(여덟 글자·오행·대운)이다. 그것이 구매자가 친구에게
+    보여 주고 싶어 하는 것이고, 이 기능이 존재하는 이유다.
+
+    ## 출생 연도는 추정될 수 있다
+
+    대운은 `start_age` 와 `start_year` 를 함께 담으므로 둘의 차로 출생 **연도**가
+    나온다. 감추지 않는 이유는 리포트 본문이 이미 나이와 연도를 말하기 때문이다 —
+    패널에서만 지우면 화면이 정직하지 않을 뿐 새는 것은 그대로다. 정확한 날짜는
+    어느 쪽으로도 나오지 않는다.
+    """
+
+    markdown: str
+    chart: SharedChartOut
+    luck: LuckOut
+    strength_verdict: str
+    source: Literal["llm", "fallback"] = "llm"
+    #: 화면이 "N일 후 만료" 를 계산하는 기준. 주문 생성 시각이다.
+    created_at: str
+    #: 이 링크는 **주문과 함께 죽는다** — 구매자 자신의 접근이 끝나는 그 순간이다.
+    retention_days: int
+
+
 class SajuShareCreated(BaseModel):
     """발급 결과. 화면이 이 id 로 주소를 만든다.
 

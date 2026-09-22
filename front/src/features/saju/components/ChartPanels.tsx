@@ -1,4 +1,4 @@
-import type { Luck, PillarDetail, SajuChart } from "../model/types";
+import type { Luck, PillarDetail, ReportChart } from "../model/types";
 import { WUXING_KEYS } from "../model/types";
 import { WUXING_LABEL, ganWuxingOf, wuxingClass, zhiWuxingOf } from "../model/wuxing";
 import { Panel, PanelLabel } from "./Panel";
@@ -18,7 +18,7 @@ const PILLAR_ORDER: ReadonlyArray<{ key: "year" | "month" | "day" | "hour"; labe
   { key: "hour", label: "시주" },
 ];
 
-export function PillarsPanel({ chart }: { chart: SajuChart }) {
+export function PillarsPanel({ chart }: { chart: ReportChart }) {
   const pillars = PILLAR_ORDER.map(({ key, label }) => ({
     label,
     detail: chart[key] as PillarDetail | null,
@@ -79,7 +79,7 @@ export function WuxingPanel({
   chart,
   strengthVerdict,
 }: {
-  chart: SajuChart;
+  chart: ReportChart;
   strengthVerdict: string;
 }) {
   const counts = WUXING_KEYS.map((key) => ({

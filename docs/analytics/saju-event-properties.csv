@@ -74,7 +74,7 @@ No,Label,Event Name,Trigger,Required,Importance,Event Property,Description,Data 
 15.6,saju_engagement,saju_report_reopened,,Y,Low,has_preamble,머리말 유무.,Boolean,true,,
 16.1,saju_engagement,saju_site_shared,공유 버튼 클릭이 끝난 뒤. 취소·미지원도 함께 센다.,Y,High,outcome,무슨 일이 일어났나.,String,shared | copied | cancelled | unsupported | failed,공유 시트가 실제로 동작하는가 — cancelled 가 많으면 문구 문제,취소는 실패가 아니다. 한 칸에 합치면 둘 다 못 읽는다
 16.2,saju_engagement,saju_site_shared,,Y,High,surface,어느 화면의 버튼인가.,String,teaser | report,티저 공유와 완독 후 공유는 동기가 다르다,
-16.3,saju_engagement,saju_site_shared,,Y,High,share_kind,결과 링크가 실제로 나갔나.,String,result | site,결과를 보낸 공유와 사이트만 보낸 공유의 비율,birth 를 받았는지가 아니라 발급이 성공했는지다 — 실패하면 조용히 site 로 떨어지고 그 둘을 합치면 영원히 못 본다. 유료 리포트 화면은 언제나 site 다(토큰만 들고 있어 발급할 수 없다)
+16.3,saju_engagement,saju_site_shared,,Y,High,share_kind,무엇이 실제로 나갔나.,String,report | result | site,무엇을 보낸 공유가 바이럴을 만드는지,발급 재료를 받았는지가 아니라 발급이 성공했는지다 — 실패하면 조용히 site 로 떨어지고 그 둘을 합치면 영원히 못 본다. report 는 유료 리포트 본문(/saju/r/{id}) result 는 여덟 글자(/saju/s/{id}) 로 담기는 것이 다르므로 합치지 않는다
 17.1,saju_purchase,saju_intro_completed,소개 웹툰의 마지막 패널이 뷰포트에 들어옴.,N,Low,panel_index_max,도달한 최대 패널 번호.,Number,12,소개 완주율 — 콘텐츠 길이 조정,Phase 2
 17.2,saju_purchase,saju_intro_completed,,N,Low,scroll_seconds,소개 화면 체류 초.,Number,55,완주자의 입력 착수율,Phase 2
 18.1,saju_engagement,saju_expired_report_opened,보관 기간이 지난 토큰으로 접근.,N,Low,days_since_purchase,결제일로부터 경과 일수.,Number,45,보관 기간 연장 수요,Phase 2

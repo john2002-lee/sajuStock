@@ -114,7 +114,7 @@
 | `saju_followup_answered` ★ | 추가질문 응답 수신 | **Critical** |
 | `saju_followup_failed` | 추가질문 실패 — 유료 사용자가 산 슬롯을 잃는 자리 | High |
 | `saju_report_reopened` | 구매한 리포트 2회차 이상 열람 | High |
-| `saju_site_shared` | 공유 버튼 클릭 종료 (취소·미지원 포함). `share_kind` 가 결과 링크와 사이트 주소를 가른다 | High |
+| `saju_site_shared` | 공유 버튼 클릭 종료 (취소·미지원 포함). `share_kind` 가 리포트 링크·여덟 글자 링크·사이트 주소를 가른다 | High |
 | `saju_expired_report_opened` | 만료 토큰 접근 | Phase 2 |
 | `saju_followup_input_abandoned` | 자유입력 작성 후 미전송 이탈 | Phase 2 |
 

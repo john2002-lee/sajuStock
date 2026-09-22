@@ -270,14 +270,17 @@ export function PaidReportScreen({ token }: { token: string }) {
         strengthVerdict={report.strengthVerdict}
         source={report.source}
         followUp={<FollowUpChat target={{ token }} initial={report.followUp} />}
-        /* `birth` 를 넘기지 **않는다** — 이 화면에는 없다(토큰만 든다). 그래서
-           사이트 주소만 나간다.
+        /* `birth` 대신 `token` 을 넘긴다 — 이 화면에는 생년월일시가 없다.
 
-           `token` 을 넘겨 주소를 만들고 싶어질 수 있는데, 그러면 안 된다: 그
-           토큰은 인증 없이 통과하는 **전체 접근 자격증명**이고 응답에 양력
-           생년월일과 추가 질문 원문이 들어 있다. 유료 사용자도 결과 링크를
-           보내게 하려면 토큰으로 발급하는 백엔드 경로가 따로 필요하다. */
-        share={<ShareButton surface="report" />}
+           **이 토큰이 공유 주소가 되는 것이 아니다.** `/saju/reports/{token}` 은
+           인증 없이 통과하는 전체 접근 자격증명이라, 그 주소를 받은 사람은 양력
+           생년월일을 보고 구매자의 남은 추가 질문까지 쓸 수 있다. 입력창만 숨긴
+           페이지를 따로 만들어도 주소를 고치면 그만이라 화면으로는 막히지 않는다.
+
+           토큰은 발급 요청에만 실리고, 나가는 것은 그것과 무관한 두 번째 난수로
+           만든 `/saju/r/{shareId}` 다 — 풀이와 계산 패널은 담기고 생년월일·추가
+           질문·토큰은 빠진다(`SajuSharedReport`). */
+        share={<ShareButton surface="report" token={token} />}
       />
     </>
   );

@@ -9,14 +9,16 @@
  * 서버 컴포넌트·라우트 핸들러는 여기서, 나머지는 `index.ts` 에서 가져간다.
  */
 export { getBirthPlaces } from "./services/getBirthPlaces";
-export { getSharedReading } from "./services/shares";
+export { getSharedReading, getSharedReport } from "./services/shares";
 export {
   fromBirthInput,
   toReading,
   toReport,
   toSharedReading,
+  toSharedReport,
   type WireReading,
   type WireReport,
   type WireShareCreated,
   type WireSharedReading,
+  type WireSharedReport,
 } from "./services/wire";

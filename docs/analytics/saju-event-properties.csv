@@ -33,7 +33,7 @@ No,Label,Event Name,Trigger,Required,Importance,Event Property,Description,Data 
 8.3,saju_purchase,saju_payment_confirmed,,Y,Medium,confirm_elapsed_ms,리다이렉트 도착부터 승인 완료까지 밀리초.,Number,1400,승인 대기 중 이탈,
 8.4,saju_purchase,saju_payment_confirmed,,Y,Medium,is_report_ready,승인 시점에 리포트가 이미 있었는가.,Boolean,false,결제 직후 기다림이 필요한 비율,거짓이면 다음 화면이 폴링한다
 8.5,saju_purchase,saju_payment_confirmed,,Y,Critical,(Revenue),같은 순간에 Amplitude Revenue 로 productId·price·quantity 를 따로 보낸다.,-,saju_report_v1 / 1000 / 1,매출·LTV·ROAS,일반 이벤트 속성의 숫자는 매출로 집계되지 않는다. 이중 집계는 없다
-9.1,saju_purchase,saju_payment_failed,주문 생성·결제창·승인 중 어느 단계든 실패.,Y,High,failure_stage,실패한 단계.,String,order | checkout | confirm,어느 칸에서 돈이 새는가,단계별로 이벤트를 쪼개지 않고 이 값으로 가른다
+9.1,saju_purchase,saju_payment_failed,주문 생성·결제창·승인 중 어느 단계든 실패.,Y,High,failure_stage,실패한 단계.,String,config | order | checkout | confirm,어느 칸에서 돈이 새는가,단계별로 이벤트를 쪼개지 않고 이 값으로 가른다. config 는 돈이 새는 것이 아니라 빌드에 토스 클라이언트 키나 APP_ORIGIN 이 없어 결제창을 아예 못 여는 경우다 — 한 건이라도 보이면 배포 설정을 봐야 한다
 9.2,saju_purchase,saju_payment_failed,,Y,High,error_code,서버/SDK 에러 코드.,String,saju_order_not_found | network,취소와 실패의 분리,
 9.3,saju_purchase,saju_payment_failed,,Y,Medium,http_status,HTTP 상태. SDK 오류는 0.,Number,409,재시도 가능 여부 판정,
 9.4,saju_purchase,saju_payment_failed,,Y,Medium,is_duplicate,409 인가 — 사람이 대조해야 하는 상태.,Boolean,false,환불 대상 건이 실패율 뒤에 숨지 않게,

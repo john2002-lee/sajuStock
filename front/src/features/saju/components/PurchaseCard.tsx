@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CHECKOUT_CONFIGURED, CHECKOUT_UNAVAILABLE_NOTICE } from "@/lib/config/payment-mode";
 import { REPORT_PRODUCT_NAME } from "@/shared/legal/product";
 import { useId, useState } from "react";
 import type { BirthInput, PaymentState } from "../model/types";
@@ -34,13 +35,27 @@ import { PayButton } from "./PayButton";
  * | 상태 | 그리는 것 | 왜 |
  * |---|---|---|
  * | `loading` | 버튼 자리를 비워 둔다 | 아직 얼마인지 모른다 |
- * | `ready` + `enabled` | 고지 + 동의 + 결제 버튼 | 정상 판매 |
+ * | `ready` + `enabled` + 결제 재료 있음 | 고지 + 동의 + 결제 버튼 | 정상 판매 |
+ * | `ready` + `enabled` + **결제 재료 없음** | 안내만 (버튼 없음) | 서버는 팔 수 있는데 **이 빌드가** 결제창을 못 연다 |
  * | `ready` + `!enabled` | 무료 열람 버튼 | **서버가** 팔 수 없다고 답했다 (키 미설정) |
  * | `unreachable` | 다시 시도 버튼 | 모른다 — 팔지도, 공짜로 주지도 않는다 |
  *
  * 마지막 칸이 이 파일에서 가장 중요하다. 예전에는 `unreachable` 과 `!enabled` 가
  * 같은 `null` 이라, **개발자 도구로 요청 하나만 막으면 유료 리포트가 무료로
  * 열렸다.** 우연이 아니라 누구나 재현할 수 있는 우회로였다.
+ *
+ * ## 세 번째 칸이 왜 생겼나
+ *
+ * 판매 가능 여부의 판단이 두 곳으로 갈려 있었다. 서버는 자기 키만 보고
+ * `enabled: true` 를 주고, 이 카드는 그 답만 믿고 결제 버튼을 그렸다. 어느 쪽도
+ * **브라우저 번들에 토스 클라이언트 키가 들어왔는지**는 보지 않았다. 그 결과 키
+ * 없이 배포된 빌드에서 버튼이 눌릴 때마다 실패했고, 화면은 "잠시 후 다시 시도해
+ * 주세요" 라고 안내했다 — 재시도로는 영원히 해결되지 않는 상태였다.
+ *
+ * **무료로 열어 주지 않는다.** 서버는 이것이 파는 물건이라고 답했으므로, 우리 설정
+ * 실수를 이유로 공짜로 주는 것은 `unreachable` 을 무료로 열지 않는 것과 같은
+ * 이유로 틀렸다. 대신 버튼을 내리고 사실을 말한다 — **누를 수 없는 것이 눌러도
+ * 실패하는 것보다 정직하다.**
  *
  * ## 무엇이 이 화면에 **남아야만** 하는가
  *
@@ -140,7 +155,16 @@ export function PurchaseCard({
   const agreeId = useId();
 
   const config = payment.status === "ready" ? payment.config : null;
-  const sellable = config?.enabled === true;
+  /**
+   * 서버가 "팔 수 있다" 고 답했고 **이 빌드도 결제창을 열 수 있다.**
+   *
+   * 두 조건을 한 변수로 합치는 것이 요점이다. 아래 머리글(`PREMIUM ANALYSIS`)과
+   * 가격·동의·결제 버튼이 전부 이 값을 보므로, 결제 재료가 없을 때 "프리미엄" 이라
+   * 적힌 카드에 누를 수 없는 버튼이 남는 조합이 만들어지지 않는다.
+   */
+  const sellable = config?.enabled === true && CHECKOUT_CONFIGURED;
+  /** 서버는 팔 수 있는데 이 빌드가 못 파는 경우. 무료로 열어 주지 않는다(머리말). */
+  const misconfigured = config?.enabled === true && !CHECKOUT_CONFIGURED;
 
   return (
     <div className="bg-surface-raise rounded-card p-6 shadow-mockup sm:p-8">
@@ -234,6 +258,26 @@ export function PurchaseCard({
 
           <PayButton birth={birth} amount={config.price} disabled={!agreed} />
         </>
+      ) : misconfigured ? (
+        // 서버는 팔 수 있다고 했지만 이 빌드에 결제 재료가 없다. 버튼을 그리지
+        // 않는다 — 누를 수 없는 것이 눌러도 실패하는 것보다 정직하다.
+        //
+        // 재시도 버튼도 두지 않는다. 빌드에 박히는 값이라 눌러도 바뀌지 않는다.
+        <div className="text-center">
+          <p
+            role="alert"
+            className="mb-4 rounded-card-sm border border-hairline bg-surface-warm px-4 py-3 text-[13px] leading-relaxed text-wuxing-fire"
+          >
+            {CHECKOUT_UNAVAILABLE_NOTICE}
+          </p>
+          <p className="text-[12.5px] leading-relaxed text-muted-2">
+            불편을 드려 죄송합니다.{" "}
+            <Link href="/support" className="underline underline-offset-2 hover:text-ink">
+              고객센터
+            </Link>
+            로 알려 주시면 빠르게 확인하겠습니다.
+          </p>
+        </div>
       ) : payment.status === "unreachable" ? (
         // **무료로 열어 주지 않는다.** 서버가 "팔 수 없다" 고 답한 것이 아니라
         // 서버에 닿지 못한 것이고, 그 둘을 같게 취급한 것이 우회로였다.

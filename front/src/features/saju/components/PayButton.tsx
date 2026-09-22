@@ -7,7 +7,12 @@ import { SAJU_EVENT, SAJU_PRODUCT_ID } from "@/shared/analytics/events";
 import type { BirthInput } from "../model/types";
 import { trackSaju } from "../model/analytics";
 import { secondsSince } from "../model/analytics-context";
-import { IS_TEST_PAYMENT, TEST_PAYMENT_NOTICE } from "@/lib/config/payment-mode";
+import {
+  CHECKOUT_CONFIGURED,
+  CHECKOUT_UNAVAILABLE_NOTICE,
+  IS_TEST_PAYMENT,
+  TEST_PAYMENT_NOTICE,
+} from "@/lib/config/payment-mode";
 import { REPORT_PRODUCT_NAME } from "@/shared/legal/product";
 import { fromBirthInput } from "../services/wire";
 import { PillToggle } from "./PillToggle";
@@ -75,6 +80,30 @@ export function PayButton({
   async function handleClick() {
     setError(null);
 
+    // **누를 때마다 반드시 실패하는 경로를 먼저 끊는다.**
+    //
+    // 예전에는 이 검사가 아래 `try` 안에서 `throw` 였다. 그 오류는 `ApiError` 가
+    // 아니므로 `catch` 가 "결제를 시작할 수 없습니다. **잠시 후 다시 시도해
+    // 주세요.**" 로 덮었는데, 빌드에 박히는 값이 없는 상태라 재시도로는 영원히
+    // 해결되지 않는다 — 화면이 고객에게 거짓말을 하고 있었다.
+    //
+    // `PurchaseCard` 가 이미 렌더 시점에 막으므로 여기까지 오는 일은 없어야 한다.
+    // 그래도 남겨 두는 것은 이 컴포넌트가 `index.ts` 로 공개돼 있어 다른 화면이
+    // 카드 없이 들 수 있기 때문이다.
+    if (!CHECKOUT_CONFIGURED) {
+      trackSaju(SAJU_EVENT.paymentFailed, {
+        failure_stage: "config",
+        error_code: "checkout_not_configured",
+        http_status: 0,
+        is_duplicate: false,
+        payment_method: method === "CARD" ? "card" : "transfer",
+        price_krw: amount,
+        retry_index: attempts.current,
+      });
+      setError(CHECKOUT_UNAVAILABLE_NOTICE);
+      return;
+    }
+
     setLoading(true);
 
     const retryIndex = attempts.current;
@@ -97,9 +126,10 @@ export function PayButton({
     let stage: "order" | "checkout" = "order";
     const startedAt = Date.now();
     try {
-      if (!CLIENT_KEY || !APP_ORIGIN) {
-        throw new Error("결제 설정이 없습니다.");
-      }
+      // 위 `CHECKOUT_CONFIGURED` 가 통과했으므로 둘 다 값이 있다. 타입을 좁히기
+      // 위한 단정이고, 판정은 한곳(`payment-mode`)에만 둔다 — 조건을 여기서 다시
+      // 적으면 두 규칙이 되고 둘이 어긋나는 날을 아무도 눈치채지 못한다.
+      if (!CLIENT_KEY || !APP_ORIGIN) throw new Error("결제 설정이 없습니다.");
 
       // 1) 서버가 주문번호와 금액을 정한다.
       const order = await bff.post<OrderCreated>("/api/saju/orders", {

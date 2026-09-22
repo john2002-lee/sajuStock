@@ -51,6 +51,21 @@ class PaymentDisabledError(AppError):
     message = "지금은 리포트를 구매할 수 없습니다. 잠시 후 다시 시도해 주세요."
 
 
+class ReportRequiresPaymentError(AppError):
+    """돈을 받고 파는 것을 돈 없이 달라고 했다.
+
+    `PaymentDisabledError` 의 **거울상**이다. 저쪽은 "팔 수 없는 상태" 이고
+    이쪽은 "팔 수 있는데 값을 치르지 않았다" 이다. 둘을 같은 에러로 뭉치면
+    화면이 "잠시 후 다시 시도" 라고 안내하게 되는데, 기다린다고 열리지 않는다.
+
+    402 를 쓴다 — 이 요청에 없는 것은 권한도 자원도 아니고 결제다.
+    """
+
+    status_code = 402
+    code = "saju_report_requires_payment"
+    message = "전체 풀이는 리포트를 구매하신 뒤 보실 수 있습니다."
+
+
 class OrderNotFoundError(AppError):
     status_code = 404
     code = "saju_order_not_found"

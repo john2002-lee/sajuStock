@@ -61,7 +61,13 @@ from app.schemas.saju import (
     SajuReportRequest,
     SajuReportResponse,
 )
-from app.services import saju_job_store, saju_order_service, saju_service
+from app.services import (
+    saju_job_store,
+    saju_order_service,
+    saju_purge_service,
+    saju_service,
+)
+from app.services.saju_order_service import ReportRequiresPaymentError
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +114,39 @@ async def list_follow_up_presets() -> FollowUpPresetsResponse:
     )
 
 
+def _deny_unpaid_full_reading(birth: BirthInput | None) -> None:
+    """**전체 풀이를 값 없이 내주는 경로를 막는다.**
+
+    ## 왜 필요했나
+
+    결제가 붙기 전에 만들어진 경로들이 그대로 남아 있었다. 티저에서 생년월일을
+    넣은 사람이 주소창에 `/saju/report` 를 치면 유료 상품인 전체 풀이가 그냥
+    나왔다 — 인증도 결제 확인도 없었다. 결제 버튼을 되살려도 **아무도 누를 이유가
+    없는** 상태였고, LLM 비용도 상한 없이 열려 있었다.
+
+    ## 무엇으로 가르나 — 요청이 무엇을 들고 왔는가
+
+    유료 경로는 `access_token` 을 들고 온다(결제로 발급된 자격 증명). 무료 경로는
+    **원본 생년월일시를 그대로** 실어 보낸다. 그래서 `birth` 가 실려 있으면 값을
+    치르지 않은 요청이다.
+
+    추가 질문(`/followup`, `/followup/jobs`)은 **유료·무료가 같은 경로를 쓴다.**
+    엔드포인트째로 막으면 구매자의 추가 질문까지 끊긴다 — 그래서 여기서
+    `birth` 유무로 가른다.
+
+    ## 결제를 팔 수 없는 환경에서는 열어 둔다
+
+    토스 키가 없는 개발·프리뷰 환경에서는 `saju_payment_enabled` 가 거짓이고,
+    그때는 화면도 무료 경로를 그린다(`PurchaseCard`). 살 방법이 없는데 막으면
+    제품을 아예 볼 수 없다.
+
+    막지 **않는** 것: `POST /saju/chart`. 여덟 글자와 무료 요약은 실제로 무료
+    상품이고, 그것이 이 제품의 입구다.
+    """
+    if birth is not None and settings.saju_payment_enabled:
+        raise ReportRequiresPaymentError()
+
+
 @router.post("/followup", response_model=FollowUpResponse, summary="사주 추가 질문")
 async def ask_follow_up(payload: FollowUpRequest, repo: SajuOrderRepo) -> FollowUpResponse:
     """리포트를 읽은 뒤의 추가 질문 하나에 답한다.
@@ -120,6 +159,7 @@ async def ask_follow_up(payload: FollowUpRequest, repo: SajuOrderRepo) -> Follow
     브라우저는 이 경로를 쓰지 않는다 — LLM 한 번이 브라우저 타임아웃을 넘겨
     `POST /saju/followup/jobs` 로 간다. 여기를 남기는 이유는 리포트 쪽과 같다.
     """
+    _deny_unpaid_full_reading(payload.birth)
     question = _resolve_question(payload)
     birth = await _resolve_birth(payload, repo)
     return await saju_service.answer_follow_up(birth, question, _ask_report_llm)
@@ -190,6 +230,7 @@ async def start_follow_up_job(
 
     유료 경로는 슬롯을 **예약한 뒤** 생성에 들어간다(`reserve_follow_up` 주석).
     """
+    _deny_unpaid_full_reading(payload.birth)
     question = _resolve_question(payload)
 
     # 유료 경로: **슬롯을 먼저 잡는다.** 답을 만든 뒤에 잡으면 동시에 여덟 번 누른
@@ -260,6 +301,7 @@ async def generate_report(payload: SajuReportRequest) -> SajuReportResponse:
     쓴다. 여기를 남겨 둔 것은 생성 로직을 한 자리에서만 잡기 위해서고, 긴 요청을
     감당할 수 있는 호출자(테스트·서버 간)를 위해서다.
     """
+    _deny_unpaid_full_reading(payload.birth)
     return await saju_service.generate_report(payload.birth, _ask_report_llm)
 
 
@@ -284,6 +326,7 @@ async def start_report_job(payload: SajuReportRequest) -> SajuJobCreated:
 
     202 를 쓰는 것은 이 응답이 결과가 아니라 접수 확인이기 때문이다.
     """
+    _deny_unpaid_full_reading(payload.birth)
     job = saju_job_store.start(
         lambda: saju_service.generate_report(payload.birth, _ask_report_llm),
         failure_message="풀이를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -380,6 +423,11 @@ async def get_payment_config() -> SajuPaymentConfig:
     키가 없으면 `enabled: false` 로 내려가고 화면은 결제 카드를 그리지 않는다.
     **팔 수 없는 상태에서 결제 버튼을 보여 주지 않는 것**이 이 값의 목적이다.
     """
+    # 보관 기간을 **광고하는 자리**가 그 약속을 지키게 한다. 크론이 없으므로
+    # 이 저장소의 다른 배치처럼 요청에 얹혀 돌고 하루 한 번으로 묶인다
+    # (`services/saju_purge_service`). 응답을 기다리지 않는다.
+    saju_purge_service.schedule_purge()
+
     return SajuPaymentConfig(
         enabled=settings.saju_payment_enabled,
         price=settings.saju_report_price,

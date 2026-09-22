@@ -5,9 +5,10 @@ import hmac
 import secrets
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.saju_retention import RetentionCutoffs
 from app.models.saju_order import SajuFollowUpRow, SajuOrderRow, SajuReportRow
 
 
@@ -226,3 +227,30 @@ class SajuOrderRepository:
             return
         row.status = "failed"
         await self._db.commit()
+
+    async def delete_expired(self, cutoffs: RetentionCutoffs) -> int:
+        """이 시각보다 앞서 만들어진 주문을 지우고, 지운 수를 돌려준다.
+
+        **리포트와 추가 질문은 따로 지우지 않는다.** 두 테이블의 `order_id` 가
+        DB 레벨 `ON DELETE CASCADE` 라 같은 문장에서 함께 사라진다
+        (`a7f3d92c4e18`·`c5e81a37f2b9` 마이그레이션). ORM 캐스케이드에 기대면
+        안 된다 — 여기는 행을 메모리로 읽지 않는 일괄 삭제라 그쪽은 돌지 않는다.
+
+        지운 수를 세는 이유는 관리자 화면이 "정말 지워지고 있나" 에 답해야
+        하기 때문이다. 파기는 안 돌아도 화면이 멀쩡한 종류라 숫자가 유일한 증거다.
+        """
+        # 경계가 둘인 이유는 `domain/saju_retention` 에 있다 — 보관 기간을
+        # 줄이기 전에 팔린 주문에는 그때의 약속(더 긴 기간)이 걸린다.
+        expired = or_(
+            and_(
+                SajuOrderRow.created_at < cutoffs.changed_at,
+                SajuOrderRow.created_at < cutoffs.legacy,
+            ),
+            and_(
+                SajuOrderRow.created_at >= cutoffs.changed_at,
+                SajuOrderRow.created_at < cutoffs.current,
+            ),
+        )
+        result = await self._db.execute(delete(SajuOrderRow).where(expired))
+        await self._db.commit()
+        return result.rowcount or 0

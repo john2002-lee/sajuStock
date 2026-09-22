@@ -355,7 +355,7 @@ class OpsSnapshot:
 #:
 #: 시가총액·등락률 배치는 아직 기록자를 붙이지 않았다 — 목록으로 두는 것은 그때
 #: 이 상수 한 줄만 늘리면 되게 하기 위함이고, 화면도 목록을 그리므로 함께 나타난다.
-_RECORDED_BATCHES: tuple[str, ...] = ("snapshot",)
+_RECORDED_BATCHES: tuple[str, ...] = ("snapshot", "saju_purge")
 
 
 async def _batch_statuses(runs: BatchRunRepository) -> list[BatchStatus]:

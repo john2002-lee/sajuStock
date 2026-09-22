@@ -24,6 +24,7 @@
 쓸 **토큰 예산**을 받는다. 그래서 `LLM_EFFORT` 를 예산으로 옮기는 표가 아래에 있다.
 """
 
+import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable
@@ -35,6 +36,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exceptions import LLMRefusedError
+from app.domain.llm_retry import is_transient
 from app.domain.llm_usage import LlmTokens
 from app.integrations import amplitude
 
@@ -303,15 +305,44 @@ def _record_embedding(
         logger.warning("Amplitude 임베딩 기록에 실패했습니다", exc_info=True)
 
 
+async def _with_transient_retry(call):
+    """빨리 실패한 호출만 다시 부른다. 나머지는 그대로 올려보낸다.
+
+    **타임아웃은 재시도하지 않는다.** 그것은 이미 상한을 다 쓴 실패라, 다시
+    부르면 같은 시간을 한 번 더 쓰고 AI 판단 예산을 무너뜨린다. 무엇이
+    일시적인지는 `domain/llm_retry.is_transient` 가 정하고, `config` 의 예산
+    불변식이 같은 모듈의 계산을 쓴다 — 판정과 예산이 갈라지지 않게.
+
+    운영 실측(2026-09-21): 503 은 1.7초 만에 돌아왔다. 한 번 더 물었으면
+    답이 왔을 호출이 간이 리포트로 떨어지고 있었다.
+    """
+    attempt = 0
+    while True:
+        try:
+            return await call()
+        except APIError as exc:
+            code = getattr(exc, "code", None)
+            if attempt >= settings.llm_transient_retries or not is_transient(code):
+                raise
+            attempt += 1
+            delay = settings.llm_transient_backoff_seconds * attempt
+            logger.warning(
+                "LLM 일시 오류(%s) — %.1f초 뒤 %d번째 재시도", code, delay, attempt
+            )
+            await asyncio.sleep(delay)
+
+
 async def ask_text(system_prompt: str, user_content: str) -> str:
     """자유 서술 응답 한 건. 거절되면 `LLMRefusedError`."""
     client = get_client()
     started = time.monotonic()
     try:
-        response = await client.aio.models.generate_content(
-            model=settings.gemini_model,
-            contents=user_content,
-            config=types.GenerateContentConfig(**_base_config(system_prompt)),
+        response = await _with_transient_retry(
+            lambda: client.aio.models.generate_content(
+                model=settings.gemini_model,
+                contents=user_content,
+                config=types.GenerateContentConfig(**_base_config(system_prompt)),
+            )
         )
     except BaseException as exc:
         _record(
@@ -409,14 +440,16 @@ async def ask_structured[ModelT: BaseModel](
     client = get_client()
     started = time.monotonic()
     try:
-        response = await client.aio.models.generate_content(
-            model=settings.gemini_model,
-            contents=user_content,
-            config=types.GenerateContentConfig(
-                **_base_config(system_prompt),
-                response_mime_type="application/json",
-                response_schema=output_model,
-            ),
+        response = await _with_transient_retry(
+            lambda: client.aio.models.generate_content(
+                model=settings.gemini_model,
+                contents=user_content,
+                config=types.GenerateContentConfig(
+                    **_base_config(system_prompt),
+                    response_mime_type="application/json",
+                    response_schema=output_model,
+                ),
+            )
         )
     except BaseException as exc:
         _record(

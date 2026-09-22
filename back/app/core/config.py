@@ -1,5 +1,6 @@
 """환경 변수 기반 애플리케이션 설정 (Pydantic v2 BaseSettings)."""
 
+from datetime import date
 from functools import lru_cache
 from typing import Literal
 
@@ -7,6 +8,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.db_url import is_postgres
+from app.domain.llm_retry import worst_case_seconds
 
 EffortLevel = Literal["low", "medium", "high", "xhigh", "max"]
 
@@ -203,7 +205,28 @@ class Settings(BaseSettings):
 
     #: 유료 주문의 보관 기간(일). 이 기간이 지나면 정리 대상이다.
     #: 화면의 개인정보 문구가 같은 숫자를 말해야 한다.
-    saju_order_retention_days: int = Field(default=30, ge=1)
+    #: 구매한 리포트를 다시 볼 수 있는 기간. 화면과 개인정보처리방침이 이 값을
+    #: 그대로 말하므로(`front/src/lib/config/public.ts` 의 `RETENTION_DAYS`)
+    #: 여기만 바꾸면 안 되고 프런트 환경변수도 함께 맞춰야 한다.
+    #:
+    #: 이 값을 읽어 실제로 지우는 것은 `services/saju_purge_service` 다.
+    #: `GET /saju/payment/config` 가 불릴 때 하루 한 번 얹혀 돌고 결과를
+    #: `batch_runs` 에 남긴다 — 파기는 조용히 안 도는 것이 가장 위험하다.
+    saju_order_retention_days: int = Field(default=7, ge=1)
+
+    #: 보관 기간을 줄이기 **전에** 팔린 주문에 적용할 기간.
+    #:
+    #: **지금은 새 기간과 같아 이 분기가 돌지 않는다(의도된 상태).** 2026-09-21 에
+    #: 30일에서 7일로 줄였고, 그 시점 DB 의 주문 70건은 전부 베타 테스트 데이터라
+    #: 실제 구매자가 없었다. 지켜야 할 옛 약속이 없으므로 유예를 두지 않는다.
+    #:
+    #: 장치는 남겨 둔다 — **판매가 시작된 뒤** 기간을 또 줄이면 그때는 구매 시점의
+    #: 약속이 걸린다. 그 경우 이 값만 옛 기간으로 올리면 유예가 살아나고,
+    #: `retention_cutoffs` 는 둘이 같을 때 분기를 스스로 없앤다.
+    saju_order_retention_days_legacy: int = Field(default=7, ge=1)
+
+    #: 보관 기간이 바뀐 날(KST). 이 앞뒤로 적용할 약속이 갈린다.
+    saju_retention_changed_on: date = date(2026, 9, 21)
 
     @property
     def saju_payment_enabled(self) -> bool:
@@ -242,6 +265,20 @@ class Settings(BaseSettings):
     # 붙잡고 있어 판단 LLM 이 예산 안에 들어올 기회를 잃는다 — 즉 재시도가
     # "의견 3건 + LLM 판단" 을 "의견 0건 + 규칙 판단" 으로 바꾼다.
     llm_max_retries: int = Field(default=0, ge=0)
+
+    #: **일시적** 실패만 다시 시도하는 횟수. 위 `llm_max_retries` 와 다르다.
+    #:
+    #: 그쪽은 SDK 가 모든 실패에 거는 재시도라, 1 로 올리면 타임아웃도 두 번
+    #: 나서 아래 불변식이 기동을 막는다(45초 × 2 = 90초 > 54초). 그런데 운영에서
+    #: 실제로 본 실패는 성질이 갈렸다 — 504 는 44초를 쓰고 죽고, 503 은 1.7초
+    #: 만에 죽는다(2026-09-21 실측). 뒤쪽은 한 번 더 물으면 대개 답이 오고
+    #: 예산도 거의 쓰지 않는다.
+    #:
+    #: 어느 것이 일시적인지는 `domain/llm_retry` 가 정한다.
+    llm_transient_retries: int = Field(default=1, ge=0, le=3)
+
+    #: 일시 실패 뒤 기다리는 시간(초). 시도마다 배수로 늘어난다.
+    llm_transient_backoff_seconds: float = Field(default=0.5, ge=0)
 
     # --- 분석 (Amplitude Agent Analytics) ---
     #
@@ -325,14 +362,20 @@ class Settings(BaseSettings):
         하므로, 호출 하나가 거기까지 갈 수 있으면 소프트 저하가 발동할 기회 자체가
         없다. 그러면 사용자는 90초를 기다린 끝에 **의견 0건짜리** 규칙 판단을 받는다.
         """
-        worst = self.llm_timeout_seconds * (self.llm_max_retries + 1)
+        worst = worst_case_seconds(
+            timeout_seconds=self.llm_timeout_seconds,
+            max_retries=self.llm_max_retries,
+            transient_retries=self.llm_transient_retries,
+            backoff_seconds=self.llm_transient_backoff_seconds,
+        )
         soft = self.advice_budget_seconds * self.advice_soft_ratio
         if worst > soft:
             raise ValueError(
                 "LLM 호출 하나의 최악 소요가 AI 판단 예산의 소프트 지점을 넘습니다 "
                 f"({self.llm_timeout_seconds:g}초 × 시도 {self.llm_max_retries + 1}회 "
                 f"= {worst:g}초 > {soft:g}초). "
-                "LLM_TIMEOUT_SECONDS 나 LLM_MAX_RETRIES 를 낮추거나 "
+                "LLM_TIMEOUT_SECONDS · LLM_MAX_RETRIES · LLM_TRANSIENT_RETRIES 를 "
+                "낮추거나 "
                 "ADVICE_BUDGET_SECONDS 를 올리세요."
             )
         return self

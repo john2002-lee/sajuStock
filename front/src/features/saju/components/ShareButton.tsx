@@ -276,10 +276,18 @@ export function ShareButton({
           사용자가 자기 사정을 직접 적은 자유 텍스트라, 그것이 나가는 줄 모르고
           누르면 놀란다 — 되돌릴 방법도 없다. 누른 뒤에 알리는 것은 고지가 아니다.
 
+          **앞으로 물어볼 것까지 말하는 것이 요점이다.** 이 링크는 스냅샷이 아니라
+          주문을 그때그때 읽는 창이다(`read_shared_report` 가 요청마다
+          `list_follow_ups` 를 부르고, 서비스도 페이지도 캐시하지 않는다). 그래서
+          공유는 한 번 누르지만 그 뒤에 물어본 것도 이미 링크를 가진 사람에게
+          보인다 — 보낸 사람이 가장 예상하기 어려운 부분이고, 나중에 개인적인 것을
+          물었을 때 드러나는 방식이라 특히 그렇다.
+
           무료 링크(`birth`)에는 여덟 글자와 요약만 담기므로 이 줄이 없다. */}
       {token && (
         <p className="max-w-[22rem] text-center text-[11.5px] leading-relaxed text-muted-2">
-          풀이와 함께 <strong className="font-semibold">주고받은 이야기</strong>도 담깁니다.
+          풀이와 함께 <strong className="font-semibold">주고받은 이야기</strong>도 담기고,{" "}
+          <strong className="font-semibold">앞으로 물어보실 내용도 보입니다.</strong>{" "}
           받으신 분은 읽기만 할 수 있습니다.
         </p>
       )}

@@ -557,6 +557,32 @@ class SharedChartOut(BaseModel):
     conventions: SharedConventionsOut
 
 
+class SharedFollowUpTurn(BaseModel):
+    """공유되는 추가 질문 한 턴. **인증 없이 나가는 응답의 일부다.**
+
+    ## `SajuFollowUpTurn` 을 재사용하지 않는 이유
+
+    그쪽은 구매자 자신의 화면이 쓰는 타입이라 `pending` 과 `source` 를 들고 있다.
+    이 타입에는 둘 다 없고, 그것이 좁히기를 **타입의 사실**로 만든다 —
+    `SharedChartOut` 이 `solar_date` 를 떨어뜨리는 것과 같은 수법이다.
+
+    `pending` 이 빠진 이유: 답이 오는 중인 턴을 공유 화면에 그리면 받은 사람은
+    영원히 "기다리는 중" 을 본다 — 그 사람은 기다릴 수 있는 쪽이 아니다. 게다가
+    구매자가 **방금 무언가를 물었다는 사실**만 새어 나간다. 그래서 끝난 턴만
+    나간다(`answered` · `refused`).
+
+    `refused` 는 남긴다. 모델이 답하지 않은 턴의 안내문을 정상 답변처럼 그리면
+    화면이 거짓을 말한다 — 구매자 화면이 그 둘을 구분하는 것과 같은 이유다.
+
+    `source` 가 빠진 이유: llm 이었는지 폴백이었는지는 우리 운영 정보이고, 링크를
+    받은 사람에게는 뜻이 없다.
+    """
+
+    question: str
+    answer: str
+    status: Literal["answered", "refused"]
+
+
 class SajuSharedReport(BaseModel):
     """공유 링크를 연 사람이 보는 리포트. **인증 없이 나가는 응답이다.**
 
@@ -564,15 +590,21 @@ class SajuSharedReport(BaseModel):
 
     `solar_date` — 그 한 칸이 곧 생년월일이다 (`SharedChartOut`).
     보정 분값 둘 — 조합이 곧 출생지 경도다 (`SharedConventionsOut`).
-    `follow_ups` — 구매자가 자기 사정을 적은 자유 텍스트다. 리포트 본문은 보낼
-      뜻이 있어 보내는 것이지만, 추가 질문까지 보낼 뜻은 없다.
     `access_token` — **이것이 실리면 이 타입의 존재 이유가 사라진다.** 받은 사람이
       곧바로 원래 화면으로 가서 남은 질문을 쓸 수 있다.
 
     ## 무엇이 남았나
 
-    리포트 본문과 계산 패널(여덟 글자·오행·대운)이다. 그것이 구매자가 친구에게
-    보여 주고 싶어 하는 것이고, 이 기능이 존재하는 이유다.
+    리포트 본문, 계산 패널(여덟 글자·오행·대운), 그리고 **끝난 추가 질문 대화**다.
+
+    추가 질문은 한동안 빠져 있었다 — 구매자가 자기 사정을 적은 자유 텍스트라 본문과
+    성질이 다르다는 이유였다. 그런데 이 기능을 쓰는 사람이 보내려는 것이 "무당과
+    주고받은 이야기" 였고, 답변만 떼어 놓으면 대화가 반쪽이 된다. 그래서 구매자가
+    **보낼 뜻으로 누르는 버튼**에 그 대화를 싣고, 대신 화면과 방침이 그 사실을
+    먼저 말한다(`ShareButton` 의 고지 · 개인정보처리방침 제1항).
+
+    **받은 사람이 새 질문을 할 수는 없다.** 이 응답에 토큰이 없고, 질문을 받는
+    경로는 토큰을 요구한다 — 화면에서 입력창을 숨기는 것과는 차원이 다른 차단이다.
 
     ## 출생 연도는 추정될 수 있다
 
@@ -587,6 +619,8 @@ class SajuSharedReport(BaseModel):
     luck: LuckOut
     strength_verdict: str
     source: Literal["llm", "fallback"] = "llm"
+    #: 끝난 추가 질문 대화. `pending` 은 들어오지 않는다 (`SharedFollowUpTurn`).
+    follow_ups: list[SharedFollowUpTurn] = []
     #: 화면이 "N일 후 만료" 를 계산하는 기준. 주문 생성 시각이다.
     created_at: str
     #: 이 링크는 **주문과 함께 죽는다** — 구매자 자신의 접근이 끝나는 그 순간이다.

@@ -18,6 +18,7 @@ import type {
   SajuReading,
   SajuReport,
   SeUn,
+  SharedFollowUpTurn,
   SharedReading,
   SharedReport,
   Strength,
@@ -139,12 +140,19 @@ export interface WireSharedChart {
   /** 서버는 관례도 함께 내리지만(보정 분값은 빼고) 화면이 읽지 않아 매핑하지 않는다. */
 }
 
+export interface WireSharedFollowUpTurn {
+  question: string;
+  answer: string;
+  status: "answered" | "refused";
+}
+
 export interface WireSharedReport {
   markdown: string;
   chart: WireSharedChart;
   luck: WireLuck;
   strength_verdict: string;
   source: "llm" | "fallback";
+  follow_ups: WireSharedFollowUpTurn[];
   created_at: string;
   retention_days: number;
 }
@@ -206,9 +214,17 @@ export function toSharedReport(wire: WireSharedReport): SharedReport {
     luck: toLuck(wire.luck),
     strengthVerdict: wire.strength_verdict,
     source: wire.source,
+    // 서버가 `pending` 을 걸러 보내지만(`_shared_follow_ups`) 키 자체가 없을
+    // 수도 있다 — 배포 순서가 어긋나 옛 백엔드가 응답하는 경우다. 그때 화면은
+    // 대화 없이 본문만 그린다.
+    followUps: (wire.follow_ups ?? []).map(toSharedFollowUpTurn),
     createdAt: wire.created_at,
     retentionDays: wire.retention_days,
   };
+}
+
+function toSharedFollowUpTurn(wire: WireSharedFollowUpTurn): SharedFollowUpTurn {
+  return { question: wire.question, answer: wire.answer, status: wire.status };
 }
 
 export function toChart(wire: WireChart): SajuChart {

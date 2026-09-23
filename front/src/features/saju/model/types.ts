@@ -149,6 +149,20 @@ export interface SharedReading {
  * 추가 질문도 담기지 않는다 — 구매자가 자기 사정을 적은 자유 텍스트이고, 리포트를
  * 보낼 뜻이 있다고 그것까지 보낼 뜻은 아니다.
  */
+/**
+ * 공유된 대화 한 턴.
+ *
+ * `ChatTurn`(`FollowUpChat`)과 합치지 않는다. 그쪽은 `pending` 과 전송 실패 상태를
+ * 들고 있고 **입력창과 한 벌**인 타입이다 — 이 타입에 그 상태가 없다는 사실이
+ * 공유 화면에 새 질문을 받을 자리가 없다는 뜻이기도 하다.
+ */
+export interface SharedFollowUpTurn {
+  question: string;
+  answer: string;
+  /** `refused` 는 모델이 답하지 않은 턴이다. 정상 답변처럼 그리면 화면이 거짓을 말한다. */
+  status: "answered" | "refused";
+}
+
 export interface SharedReport {
   markdown: string;
   chart: ReportChart;
@@ -156,6 +170,11 @@ export interface SharedReport {
   strengthVerdict: string;
   /** `fallback` 이면 LLM 없이 만든 간이 리포트다. 배지가 이 값으로 켜진다. */
   source: "llm" | "fallback";
+  /**
+   * 끝난 추가 질문 대화. 서버가 `pending` 을 걸러 보낸다
+   * (`saju_order_service._shared_follow_ups`).
+   */
+  followUps: SharedFollowUpTurn[];
   /** ISO 문자열. 화면이 "N일 후 만료" 를 계산하는 기준(주문 생성 시각). */
   createdAt: string;
   /** 서버가 정한 보관 기간(일). 화면에 상수로 두지 않는다. */

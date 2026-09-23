@@ -740,7 +740,6 @@ class TestReadSharedReport:
         assert "longitude_correction_minutes" not in raw
         assert "equation_of_time_minutes" not in raw
         assert "access_token" not in raw
-        assert "follow_up" not in raw
         # 값으로도 새지 않는지 — 키 검사만으로는 중첩된 것을 못 잡는다.
         assert "1990-05-15" not in raw
 
@@ -760,3 +759,98 @@ class TestReadSharedReport:
 
         with pytest.raises(OrderNotFoundError):
             await read_shared_report("shr", orders)
+
+
+class TestSharedFollowUps:
+    """공유되는 대화. **끝난 턴만, 그리고 새 질문을 할 길은 없이.**
+
+    추가 질문은 구매자가 자기 사정을 적은 자유 텍스트라 리포트 본문과 성질이 다르다.
+    그것을 싣기로 한 것은 이 기능을 쓰는 사람이 보내려는 것이 "무당과 주고받은
+    이야기" 이기 때문이고, 그래서 **무엇이 실리고 무엇이 안 실리는지**를 여기서
+    못박는다.
+    """
+
+    def _orders(self, *turns: FakeFollowUp) -> FakeRepo:
+        # 차트는 **실제 매퍼로** 짓는다 (`_stored_chart` 주석) — 손으로 적으면
+        # 매퍼에 필드가 느는 날 이 테스트만 옛 모양을 검사하며 통과한다.
+        repo = FakeRepo(
+            FakeOrder(status="paid", report_share_id="shr"),
+            report=FakeReport(chart=_stored_chart()),
+        )
+        repo.follow_ups.extend(turns)
+        return repo
+
+    @pytest.mark.asyncio
+    async def test_answered_turns_come_through_in_order(self):
+        orders = self._orders(
+            FakeFollowUp(1, "order-1", "올해 재물운은?", "나쁘지 않네", "answered"),
+            FakeFollowUp(2, "order-1", "이직은 어떤가?", "기다리게", "answered"),
+        )
+
+        shared = await read_shared_report("shr", orders)
+
+        assert [t.question for t in shared.follow_ups] == ["올해 재물운은?", "이직은 어떤가?"]
+        assert [t.answer for t in shared.follow_ups] == ["나쁘지 않네", "기다리게"]
+
+    @pytest.mark.asyncio
+    async def test_pending_turn_is_not_shared(self):
+        """**답이 오는 중인 턴은 나가지 않는다.**
+
+        받은 사람은 기다릴 수 있는 쪽이 아니라 영원히 "대기" 를 보게 되고, 구매자가
+        방금 무언가를 물었다는 사실만 새어 나간다.
+        """
+        orders = self._orders(
+            FakeFollowUp(1, "order-1", "끝난 질문", "답", "answered"),
+            FakeFollowUp(2, "order-1", "방금 물어본 것", None, "pending"),
+        )
+
+        shared = await read_shared_report("shr", orders)
+
+        assert [t.question for t in shared.follow_ups] == ["끝난 질문"]
+        assert "방금 물어본 것" not in shared.model_dump_json()
+
+    @pytest.mark.asyncio
+    async def test_refused_turn_is_shared_with_its_status(self):
+        """거절된 턴의 안내문을 정상 답변처럼 그리면 화면이 거짓을 말한다."""
+        orders = self._orders(
+            FakeFollowUp(1, "order-1", "로또 번호", "그건 답할 수 없네", "refused"),
+        )
+
+        shared = await read_shared_report("shr", orders)
+
+        assert shared.follow_ups[0].status == "refused"
+
+    @pytest.mark.asyncio
+    async def test_answered_but_empty_answer_is_not_shared(self):
+        """답이 없으면 **질문만** 나간다 — 값어치는 없고 노출은 그대로다."""
+        orders = self._orders(
+            FakeFollowUp(1, "order-1", "빈 답이 달린 질문", "   ", "answered"),
+        )
+
+        shared = await read_shared_report("shr", orders)
+
+        assert shared.follow_ups == []
+
+    @pytest.mark.asyncio
+    async def test_no_follow_ups_is_an_empty_list_not_an_error(self):
+        """대화 없이 리포트만 산 사람이 대다수다. 그 경우가 정상 경로다."""
+        shared = await read_shared_report("shr", self._orders())
+
+        assert shared.follow_ups == []
+
+    @pytest.mark.asyncio
+    async def test_token_still_never_travels_with_the_conversation(self):
+        """**대화를 실어도 토큰은 안 실린다.**
+
+        받은 사람이 새 질문을 못 하는 근거가 화면이 아니라 이것이다 — 질문을 받는
+        경로는 토큰을 요구하고, 이 응답에는 토큰이 담길 칸이 없다.
+        """
+        orders = self._orders(
+            FakeFollowUp(1, "order-1", "질문", "답", "answered"),
+        )
+
+        raw = (await read_shared_report("shr", orders)).model_dump_json()
+
+        assert "access_token" not in raw
+        assert "token" not in raw
+        assert "solar_date" not in raw

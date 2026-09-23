@@ -271,6 +271,19 @@ export function ShareButton({
         {birth || token ? "결과 공유하기" : "친구에게 알려주기"}
       </button>
 
+      {/* **무엇이 나가는지 누르기 전에 말한다.**
+          유료 링크에는 풀이 본문과 **주고받은 이야기**가 함께 담긴다. 추가 질문은
+          사용자가 자기 사정을 직접 적은 자유 텍스트라, 그것이 나가는 줄 모르고
+          누르면 놀란다 — 되돌릴 방법도 없다. 누른 뒤에 알리는 것은 고지가 아니다.
+
+          무료 링크(`birth`)에는 여덟 글자와 요약만 담기므로 이 줄이 없다. */}
+      {token && (
+        <p className="max-w-[22rem] text-center text-[11.5px] leading-relaxed text-muted-2">
+          풀이와 함께 <strong className="font-semibold">주고받은 이야기</strong>도 담깁니다.
+          받으신 분은 읽기만 할 수 있습니다.
+        </p>
+      )}
+
       {/* `aria-live` — 라벨이 아니라 이 줄이 바뀌므로, 스크린리더 사용자에게는
           알려 주지 않으면 아무 일도 일어나지 않은 것과 같다. */}
       <p aria-live="polite" className="min-h-[1rem] text-center text-[11.5px] text-muted-2">

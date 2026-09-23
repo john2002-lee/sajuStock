@@ -44,6 +44,7 @@ from app.schemas.saju import (
     SajuShareCreated,
     SajuSharedReport,
     SharedChartOut,
+    SharedFollowUpTurn,
 )
 from app.services import saju_service
 
@@ -562,9 +563,40 @@ async def read_shared_report(share_id: str, repo: SajuOrderRepository) -> SajuSh
         luck=LuckOut.model_validate(stored.get("luck") or {}),
         strength_verdict=str(stored.get("strength_verdict") or ""),
         source=report.source,  # type: ignore[arg-type]
+        follow_ups=await _shared_follow_ups(order.id, repo),
         created_at=order.created_at.isoformat(),
         retention_days=settings.saju_order_retention_days,
     )
+
+
+#: 공유 화면에 나갈 수 있는 턴의 상태. `pending` 이 빠진 이유는
+#: `SharedFollowUpTurn` 주석에 있다 — 받은 사람은 기다릴 수 있는 쪽이 아니다.
+_SHAREABLE_FOLLOW_UP_STATUSES = frozenset({"answered", "refused"})
+
+
+async def _shared_follow_ups(
+    order_id: str, repo: SajuOrderRepository
+) -> list[SharedFollowUpTurn]:
+    """끝난 추가 질문만 공유 모양으로 옮긴다.
+
+    `list_follow_ups` 는 `failed` 를 이미 빼고 `pending` 은 **남긴다** — 구매자
+    화면이 "답이 오는 중" 을 그려야 하기 때문이다. 공유 화면에는 그 턴이 있으면 안
+    되므로 여기서 한 번 더 좁힌다.
+
+    답이 비어 있는 턴도 뺀다. 상태가 `answered` 인데 본문이 없는 행은 없어야
+    하지만, 있다면 그것은 **질문만 실려 나가는** 턴이다 — 구매자가 물은 내용만
+    남고 답이 없으면 공유의 값어치는 없으면서 노출은 그대로다.
+    """
+    turns = await repo.list_follow_ups(order_id)
+    return [
+        SharedFollowUpTurn(
+            question=turn.question,
+            answer=turn.answer or "",
+            status=turn.status,  # type: ignore[arg-type]
+        )
+        for turn in turns
+        if turn.status in _SHAREABLE_FOLLOW_UP_STATUSES and (turn.answer or "").strip()
+    ]
 
 
 async def birth_for_token(token: str, repo: SajuOrderRepository) -> BirthInput:

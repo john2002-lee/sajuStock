@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { NoticePopup, SajuEntry } from "@/features/saju";
-import { IS_TEST_PAYMENT } from "@/lib/config/payment-mode";
 import { getBirthPlaces } from "@/features/saju/server";
 import { LottoSection } from "@/features/lotto/server";
 import type { Metadata } from "next";
@@ -44,12 +43,15 @@ export default async function HomePage() {
   const places = await getBirthPlaces();
   return (
     <>
-      {/* 테스트 결제 안내. 뜰지 말지는 **토스 클라이언트 키 접두사**가 정한다
-          (`lib/config/payment-mode`) — 라이브 키로 다시 빌드하면 저절로 사라진다.
-          같은 문장이 결제 버튼 아래에도 있고 그쪽이 진짜 고지다. 이건 처음 온
-          사람에게 한 번 크게 알리는 쪽.
+      {/* 추석·오픈 기념 인사. **조건 없이 뜨고 스스로 사라지지 않는다** —
+          이벤트는 토스 키에도 가격에도 묶여 있지 않으므로 파생시킬 값이 없다.
+          **내릴 때가 되면 이 한 줄을 지운다.** 날짜로 자동 종료하려면 서버 시각으로
+          판정해 내려보내야 한다(화면이 `new Date()` 를 보면 기기 시계를 옮기는
+          것만으로 기간이 바뀐다 — 지워진 `isFreeEvent` 가 그 모양이었다).
+          혜택은 약속하지 않는다 — 무료 행사는 닫혔고 리포트 가격은 1,000원이다.
+          (결제가 아직 테스트 키로 도는 것은 팝업이 아래에 한 줄로 따로 말한다.)
           닫았는지는 `localStorage` 에 있어 팝업이 스스로 본다. */}
-      <NoticePopup active={IS_TEST_PAYMENT} />
+      <NoticePopup active />
       <SajuEntry places={places} />
       {/* 로또 조합은 **폼 다음** 이다. 이 화면에 온 사람이 하러 온 일은 사주
           입력이고, 로또는 그 일을 마치거나 내려보다가 만나면 된다. 앞에 두면

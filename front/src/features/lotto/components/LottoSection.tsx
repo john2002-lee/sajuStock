@@ -5,7 +5,7 @@ import { getLottoSnapshot } from "../services/getLottoStats";
 import { NumberBalls } from "./NumberBalls";
 
 /**
- * 이번 주 조합 세 세트 — **서버 컴포넌트다.**
+ * 이번 주 조합 다섯 세트 — **서버 컴포넌트다.**
  *
  * ## 왜 클라이언트 JS 가 없나
  *
@@ -63,7 +63,7 @@ import { NumberBalls } from "./NumberBalls";
  * 점은 해결했지만, 금빛 공 여섯 개 옆에 회색 알파벳 하나가 서 있는 모양이 무엇도
  * 말하지 않았다.
  *
- * 해 · 달 · 별을 쓴다. 셋이 서로 확실히 구별되고(잎과 행성처럼 헷갈리는 짝이
+ * 해 · 달 · 별 · 구름 · 번개를 쓴다. 셋이 서로 확실히 구별되고(잎과 행성처럼 헷갈리는 짝이
  * 없다), 진태양시를 계산하는 사이트의 결과 맞는다. 순서도 자연스럽다.
  *
  * `sun` · `moon` 은 헤더 메뉴의 밝기 선택에도 쓰이지만, 맥락과 자리가 멀어 같은
@@ -80,6 +80,10 @@ const SET_MARKS = [
   // `star` 가 아니라 `star-filled` 다. 외곽선 별을 쓰면 채워진 해·달 옆에서 혼자
   // 가벼워 보여 셋이 한 벌로 읽히지 않는다.
   { icon: "star-filled", label: "세 번째 조합" },
+  // 세 세트에서 다섯 세트로 늘리며(사용자 요청) 같은 하늘의 짝을 이어 붙였다 —
+  // 구름 · 번개. 앞의 셋과 모양이 겹치지 않고, 채운 아이콘이라 무게도 맞는다.
+  { icon: "cloud-filled", label: "네 번째 조합" },
+  { icon: "zap-filled", label: "다섯 번째 조합" },
 ] as const;
 
 export interface LottoSectionProps {
@@ -140,7 +144,7 @@ export function LottoSection({ action, level = 2 }: LottoSectionProps) {
 
         {/* 세로로 쌓는다. 셋을 가로로 늘어놓으면 모바일에서 공 지름이 줄어 숫자가
             읽히지 않고, 데스크톱에서는 세 칸이 서로 비교 대상처럼 보인다 — 우열이
-            없는 세 조합인데. */}
+            없는 다섯 조합인데. */}
         <div className="lg:col-start-2 lg:row-start-1 lg:row-span-2">
           <ul className="grid gap-3">
             {sets.map((numbers, index) => (

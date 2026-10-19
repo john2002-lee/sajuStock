@@ -44,7 +44,7 @@ export const revalidate = 0;
 export const metadata: Metadata = {
   title: { absolute: "AI Of Tellers · 이번 주 행운의 번호" },
   description:
-    "지난 기록을 자리별로 집계해 뽑은 이번 주 행운의 번호 세 조합. 회원가입 없이 바로 확인하세요.",
+    "지난 기록을 자리별로 집계해 뽑은 이번 주 행운의 번호 다섯 조합. 회원가입 없이 바로 확인하세요.",
 };
 
 export default function LottoPage() {

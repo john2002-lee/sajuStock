@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import {
   BUSINESS_INFO,
-  ECOMMERCE_IS_PENDING,
+  ECOMMERCE_IS_LISTED,
   HOSTING_PROVIDER,
   IS_PLACEHOLDER,
   PLACEHOLDER_NOTICE,
@@ -25,8 +25,8 @@ import { SUPPORT_EMAIL } from "@/lib/config/public";
  * ## 공정위 조회 링크는 진짜 번호일 때만
  *
  * 등록되지 않은 번호로 조회 링크를 걸면 눌러 본 사람이 "조회 결과 없음" 을 본다 —
- * 없는 것보다 나쁘다. 통신판매업 신고 전(`ECOMMERCE_IS_PENDING`)도 같은 이유로
- * 걸지 않는다 — 공정위 조회는 신고된 사업자만 보여 준다.
+ * 없는 것보다 나쁘다. 통신판매업 신고 전이거나 면제(간이과세자)인 경우도 같은
+ * 이유로 걸지 않는다 — 공정위 조회는 신고된 사업자만 보여 준다(`ECOMMERCE_IS_LISTED`).
  */
 export function BusinessInfoTable() {
   return (
@@ -59,7 +59,7 @@ export function BusinessInfoTable() {
         <dd className="text-muted-75">{HOSTING_PROVIDER}</dd>
       </dl>
 
-      {!IS_PLACEHOLDER && !ECOMMERCE_IS_PENDING && (
+      {!IS_PLACEHOLDER && ECOMMERCE_IS_LISTED && (
         <p className="pt-1 text-12 text-muted-60">
           사업자등록 정보는{" "}
           <a

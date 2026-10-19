@@ -3,7 +3,7 @@ import { QUOTE_DELAY_NOTE } from "@/lib/config/marketHours";
 import { RETENTION_DAYS, SUPPORT_EMAIL } from "@/lib/config/public";
 import {
   BUSINESS_INFO,
-  ECOMMERCE_IS_PENDING,
+  ECOMMERCE_IS_LISTED,
   IS_PLACEHOLDER,
   businessRows,
 } from "@/shared/legal/business";
@@ -165,9 +165,9 @@ export function Footer({
             {businessRows()
               .map(([label, value]) => `${label} ${value}`)
               .join(" · ")}
-            {/* 공정위 조회는 통신판매업 신고된 사업자만 보여 준다. 신고 전에 걸면
+            {/* 공정위 조회는 통신판매업 신고된 사업자만 보여 준다. 신고 전·면제일 때 걸면
                 눌러 본 사람이 "조회 결과 없음" 을 본다(`BusinessInfoTable` 과 같은 규칙). */}
-            {!ECOMMERCE_IS_PENDING ? (
+            {ECOMMERCE_IS_LISTED ? (
               <>
                 {" · "}
                 <a

@@ -28,11 +28,11 @@
  * 그래서 필수 항목이 하나라도 비었거나 형식이 틀리면 표 전체가 임시값으로 떨어지고
  * `PLACEHOLDER_NOTICE` 가 함께 나온다.
  *
- * **통신판매업 신고번호만은 예외다.** 신고에는 PG 가 발급하는 구매안전서비스
- * 이용확인증이 필요한데, 그 PG 는 사업자 정보가 사이트에 떠 있어야 심사를 한다.
- * 이 번호 하나 때문에 표 전체를 임시값으로 떨어뜨리면 그 순환을 끊을 수 없다.
- * 그래서 이 칸이 비면 지어내지 않고 `ECOMMERCE_PENDING` 이라고 **사실대로** 적고,
- * 나머지 다섯 칸은 실제 값으로 선다. 번호를 넣으면 이 표시는 저절로 내려간다.
+ * **통신판매업 신고번호만은 예외다.** 이 칸에는 번호가 아닌 사실이 들어갈 수 있다 —
+ * 신고 전이면 `ECOMMERCE_PENDING`, 간이과세자처럼 신고가 면제되면 그 사유
+ * ("간이과세자 신고 면제")를 환경변수에 그대로 적는다. 번호 하나 때문에 표 전체를
+ * 임시값으로 떨어뜨리면, 사업자 정보가 떠 있어야 심사하는 PG 와의 순환을 끊을 수
+ * 없다. 공정위 조회 링크는 값이 **신고번호 형식일 때만** 건다(`ecommerceListed`).
  *
  * 형식 검사는 `public.ts` 의 `resolveSupportEmail` 이 예약 도메인을 떨어뜨리는 것과
  * 같은 장치다 — **자리값을 환경변수에 붙여넣어도 진짜로 통과하지 못하게** 한다.
@@ -97,7 +97,17 @@ const REG_NO = /^\d{3}-\d{2}-\d{5}$/;
 /** 형식은 맞지만 아무의 것도 아닌 번호. 자리값이 그대로 배포되는 것을 막는다. */
 const NOT_A_REAL_REG_NO = "000-00-00000";
 
-/** `2026-서울강남-1234` 처럼 자유 형식이라 "비지 않았는가" 만 본다. */
+/**
+ * 통신판매업 신고번호. `2026-서울도봉-1234` — 연도, 지자체, 일련번호. 신고증에
+ * 적힌 `제…호` 를 그대로 붙여넣어도 받는다. 이 모양이 아니면 면제 사유 같은 글로
+ * 보고, 표에는 그대로 내되 조회 링크는 걸지 않는다.
+ *
+ * 링크 자체는 사업자등록번호로 조회한다(`wrkr_no`). 이 형식은 "공정위에 실려 있을
+ * 것" 을 짐작하는 대리 지표일 뿐이다 — 신고하지 않은 사업자는 거기 없다.
+ */
+const ECOMMERCE_NO = /^제?\s*\d{4}-[^\s-]+-\d+\s*호?$/;
+
+/** 자유 형식 값이 "비지 않았는가" 만 본다. */
 function filled(value: string | undefined): string | null {
   const trimmed = (value ?? "").trim();
   if (trimmed.length === 0) return null;
@@ -124,10 +134,11 @@ export interface ResolvedBusiness {
   /** 아래 값이 실제 사업자 정보가 아니라 임시값인가. */
   readonly isPlaceholder: boolean;
   /**
-   * 사업자 정보는 실제인데 통신판매업 신고번호만 아직 없는가. 공정위 조회 링크는
-   * 이때 걸지 않는다 — 신고 전에는 눌러 봐야 "조회 결과 없음" 이다.
+   * 공정위 통신판매사업자 공개페이지에 실린 사업자인가 — 통신판매업 칸이 신고번호
+   * 형식일 때만 참이다. 신고 전이거나 면제면 거기 없으므로, 조회 링크를 걸면 눌러 본
+   * 사람이 "조회 결과 없음" 을 본다.
    */
-  readonly ecommercePending: boolean;
+  readonly ecommerceListed: boolean;
 }
 
 /** 통신판매업 신고 전에 그 칸에 적는 말. 번호처럼 보이는 것을 지어내지 않는다. */
@@ -163,7 +174,7 @@ export function resolveBusiness(env: BusinessEnv): ResolvedBusiness {
       info: PLACEHOLDER_INFO,
       officer: PLACEHOLDER_OFFICER,
       isPlaceholder: true,
-      ecommercePending: false,
+      ecommerceListed: false,
     };
   }
 
@@ -182,7 +193,7 @@ export function resolveBusiness(env: BusinessEnv): ResolvedBusiness {
       연락처: filled(env.officerContact) ?? phone,
     },
     isPlaceholder: false,
-    ecommercePending: ecommerceNo === null,
+    ecommerceListed: ecommerceNo !== null && ECOMMERCE_NO.test(ecommerceNo),
   };
 }
 
@@ -204,8 +215,8 @@ export const PRIVACY_OFFICER: PrivacyOfficer = RESOLVED.officer;
 /** 아래 값이 실제 사업자 정보가 아니라 임시값임을 나타낸다. */
 export const IS_PLACEHOLDER: boolean = RESOLVED.isPlaceholder;
 
-/** 통신판매업 신고번호만 아직 없는가 (`ResolvedBusiness.ecommercePending`). */
-export const ECOMMERCE_IS_PENDING: boolean = RESOLVED.ecommercePending;
+/** 공정위 조회 링크를 걸어도 되는가 (`ResolvedBusiness.ecommerceListed`). */
+export const ECOMMERCE_IS_LISTED: boolean = RESOLVED.ecommerceListed;
 
 /**
  * 호스팅 서비스 제공자. 전자상거래법이 사업자 정보와 함께 요구한다.

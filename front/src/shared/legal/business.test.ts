@@ -49,34 +49,60 @@ describe("전부 갖췄을 때", () => {
   });
 });
 
-describe("통신판매업 신고번호만 없을 때 — 신고 준비 중", () => {
-  // 신고에는 PG 가 발급하는 구매안전서비스 이용확인증이 필요하고, 그 PG 는 사업자
-  // 정보가 사이트에 떠 있어야 심사한다. 번호 하나 때문에 표 전체를 임시값으로
-  // 떨어뜨리면 이 순환을 끊을 수 없다. 그래서 이 칸만은 **사실대로** 비워 둔다.
-  test("나머지 다섯은 실제 값으로 서고, 임시값 고지는 내려간다", () => {
+describe("통신판매업 신고번호 칸 — 번호가 아닐 수 있다", () => {
+  // 이 칸에는 번호 말고도 사실이 들어간다. 신고 전이면 "신고 준비 중", 간이과세자는
+  // 신고가 면제되므로 그 사실을 적는다. 번호 하나 때문에 표 전체를 임시값으로
+  // 떨어뜨리면, 사업자 정보가 떠 있어야 심사하는 PG 와의 순환을 끊을 수 없다.
+  test("비어 있으면 나머지 다섯은 실제 값으로 서고, 그 칸은 신고 준비 중이다", () => {
     const r = resolveBusiness({ ...REAL, ecommerceNo: undefined });
 
     assert.equal(r.isPlaceholder, false);
-    assert.equal(r.ecommercePending, true);
+    assert.equal(r.ecommerceListed, false);
     assert.equal(r.info.상호, "에이아이오브텔러스");
     assert.equal(r.info.통신판매업신고번호, ECOMMERCE_PENDING);
   });
 
   test("공백·자리값도 없는 것과 같다", () => {
     for (const blank of ["", "   ", "(임시) 통신판매업신고번호"]) {
-      assert.equal(resolveBusiness({ ...REAL, ecommerceNo: blank }).ecommercePending, true, blank);
+      const r = resolveBusiness({ ...REAL, ecommerceNo: blank });
+      assert.equal(r.info.통신판매업신고번호, ECOMMERCE_PENDING, blank);
+      assert.equal(r.ecommerceListed, false, blank);
     }
   });
 
-  test("번호가 들어오면 준비 중 표시가 저절로 내려간다", () => {
+  test("면제 사유는 적힌 그대로 내되, 공정위 조회 대상은 아니다", () => {
+    // 신고하지 않은 사업자는 공정위 공개페이지에 없다 — 링크를 걸면 "조회 결과 없음".
+    const r = resolveBusiness({ ...REAL, ecommerceNo: "간이과세자 신고 면제" });
+
+    assert.equal(r.isPlaceholder, false);
+    assert.equal(r.info.통신판매업신고번호, "간이과세자 신고 면제");
+    assert.equal(r.ecommerceListed, false);
+  });
+
+  test("신고번호 형식이면 공정위 조회 대상이다", () => {
     const r = resolveBusiness(REAL);
 
-    assert.equal(r.ecommercePending, false);
+    assert.equal(r.ecommerceListed, true);
     assert.equal(r.info.통신판매업신고번호, "2026-서울강남-01234");
   });
 
-  test("임시값 표에서는 준비 중이라고 말하지 않는다 — 그 표 전체가 가짜다", () => {
-    assert.equal(resolveBusiness({}).ecommercePending, false);
+  test("신고증의 '제…호' 표기를 그대로 붙여넣어도 신고번호다", () => {
+    for (const no of ["제2026-서울도봉-0123호", "2026-서울도봉-0123호", "제 2026-서울도봉-0123 호"]) {
+      assert.equal(resolveBusiness({ ...REAL, ecommerceNo: no }).ecommerceListed, true, no);
+    }
+  });
+
+  test("거의 맞는 값은 신고번호로 보지 않는다 — 링크가 빠질 뿐 표에는 그대로 나간다", () => {
+    for (const no of ["2026-서울 도봉-0123", "2026–서울도봉–0123", "202-서울도봉-0123"]) {
+      const r = resolveBusiness({ ...REAL, ecommerceNo: no });
+      assert.equal(r.ecommerceListed, false, no);
+      assert.equal(r.info.통신판매업신고번호, no);
+    }
+  });
+
+  test("임시값 표는 번호가 맞아도 조회 대상이 아니다 — 그 표 전체가 가짜다", () => {
+    assert.equal(resolveBusiness({}).ecommerceListed, false);
+    assert.equal(resolveBusiness({ ...REAL, name: undefined }).ecommerceListed, false);
   });
 });
 

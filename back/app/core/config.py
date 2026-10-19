@@ -241,6 +241,18 @@ class Settings(BaseSettings):
     #: 아직 열리는" 상태는 7일이라는 말을 거짓으로 만들므로, 삭제에 의존하지 않는다.
     saju_share_retention_days: int = Field(default=7, ge=1)
 
+    # --- 디지털 부적 ---
+    #: 부적 한 장의 가격(원). `saju_report_price` 와 같은 이유로 **코드가 정한다** —
+    #: 화면·결제 요청·승인 검증이 같은 값을 봐야 한다. 프런트의 표시용 가격
+    #: (`front/src/shared/legal/talisman.ts` 의 `TALISMAN_PRICE`)도 함께 고친다.
+    talisman_price: int = 3000
+
+    #: 결제 승인 뒤 원본을 받을 수 있는 기간(일). **이 안에 한 번만** 받는다(일회
+    #: 다운로드 — `TalismanOrderRow.downloaded_at`). 화면과 약관이 같은 숫자를
+    #: 말한다(`TALISMAN_DOWNLOAD_DAYS`). 주문 행에는 개인정보가 없어 지우지 않고,
+    #: 기간은 **다운로드 경로가 강제한다**(`talisman_order_service.download`).
+    talisman_download_days: int = Field(default=7, ge=1)
+
     @property
     def saju_payment_enabled(self) -> bool:
         """결제를 팔 수 있는 상태인가.

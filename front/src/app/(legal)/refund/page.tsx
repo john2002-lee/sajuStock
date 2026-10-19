@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SUPPORT_EMAIL } from "@/lib/config/public";
-import { REFUND_REQUEST_FIELDS, REFUND_RULES } from "@/shared/legal/refund";
+import {
+  REFUND_REQUEST_FIELDS,
+  REFUND_RULES,
+  TALISMAN_REFUND_RULES,
+  type RefundRule,
+} from "@/shared/legal/refund";
+import { TALISMAN_PRODUCTS } from "@/shared/legal/talisman";
 import { BusinessInfoTable } from "../_components/BusinessInfoTable";
 import { DocHeading, Section } from "../_components/Section";
 
@@ -27,7 +33,7 @@ import { DocHeading, Section } from "../_components/Section";
 
 export const metadata: Metadata = {
   title: "환불정책",
-  description: "AI Of Tellers 사주 리포트의 환불 기준과 접수 방법.",
+  description: "AI Of Tellers 사주 리포트·디지털 부적의 환불 기준과 접수 방법.",
 };
 
 export default function RefundPolicyPage() {
@@ -37,10 +43,20 @@ export default function RefundPolicyPage() {
 
       <Section title="1. 이 정책이 다루는 것">
         <p>
-          AI Of Tellers 가 판매하는 유료 상품은{" "}
-          <strong className="font-semibold text-ink">정밀 사주 리포트</strong> 하나이며,
-          결제 승인 직후 생성이 시작되는 디지털 콘텐츠입니다. 아래 기준은 그 상품에
-          적용됩니다.
+          AI Of Tellers 가 판매하는 유료 상품은 두 가지이며, 둘 다 디지털 콘텐츠입니다.
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <strong className="font-semibold text-ink">정밀 사주 리포트</strong> — 결제 승인
+            직후 생성이 시작됩니다.
+          </li>
+          <li>
+            <strong className="font-semibold text-ink">디지털 부적</strong>(
+            {TALISMAN_PRODUCTS.map((t) => t.name).join(" · ")}) — 결제 승인 직후 원본을
+            내려받을 수 있게 됩니다.
+          </li>
+        </ul>
+        <p>
         </p>
         <p>
           같은 내용이{" "}
@@ -53,17 +69,10 @@ export default function RefundPolicyPage() {
       </Section>
 
       <Section title="2. 상황별 환불 기준">
-        <dl className="space-y-3">
-          {REFUND_RULES.map((rule) => (
-            <div
-              key={rule.상황}
-              className="rounded-card-sm border border-line-20 px-4 py-3"
-            >
-              <dt className="mb-1 font-semibold text-ink">{rule.상황}</dt>
-              <dd className="text-[14.5px] leading-[1.7] text-muted-75">{rule.처리}</dd>
-            </div>
-          ))}
-        </dl>
+        <p className="font-semibold text-ink">정밀 사주 리포트</p>
+        <RuleList rules={REFUND_RULES} />
+        <p className="pt-2 font-semibold text-ink">디지털 부적</p>
+        <RuleList rules={TALISMAN_REFUND_RULES} />
       </Section>
 
       <Section title="3. 청약철회가 제한되는 이유">
@@ -81,8 +90,8 @@ export default function RefundPolicyPage() {
           결제가 진행되지 않습니다.
         </p>
         <p>
-          결제 전에는 여덟 글자와 무료 요약을 먼저 보실 수 있습니다. 어떤 내용을 사는
-          것인지 확인하신 뒤 결정해 주세요.
+          결제 전에는 여덟 글자와 무료 요약을, 디지털 부적은 저해상도 견본을 먼저 보실 수
+          있습니다. 어떤 내용을 사는 것인지 확인하신 뒤 결정해 주세요.
         </p>
       </Section>
 
@@ -135,5 +144,18 @@ export default function RefundPolicyPage() {
         <BusinessInfoTable />
       </Section>
     </>
+  );
+}
+
+function RuleList({ rules }: { rules: readonly RefundRule[] }) {
+  return (
+    <dl className="space-y-3">
+      {rules.map((rule) => (
+        <div key={rule.상황} className="rounded-card-sm border border-line-20 px-4 py-3">
+          <dt className="mb-1 font-semibold text-ink">{rule.상황}</dt>
+          <dd className="text-[14.5px] leading-[1.7] text-muted-75">{rule.처리}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

@@ -14,6 +14,7 @@ from app.repositories.listed_company import ListedCompanyRepository
 from app.repositories.llm_usage import LlmUsageRepository
 from app.repositories.saju_order import SajuOrderRepository
 from app.repositories.saju_share import SajuShareRepository
+from app.repositories.talisman import TalismanRepository
 from app.repositories.visit import VisitRepository
 from app.repositories.watchlist import WatchlistRepository
 
@@ -137,3 +138,10 @@ def get_saju_share_repository(db: DbSession) -> SajuShareRepository:
 
 
 SajuShareRepo = Annotated[SajuShareRepository, Depends(get_saju_share_repository)]
+
+
+def get_talisman_repository(db: DbSession) -> TalismanRepository:
+    return TalismanRepository(db)
+
+
+TalismanRepo = Annotated[TalismanRepository, Depends(get_talisman_repository)]

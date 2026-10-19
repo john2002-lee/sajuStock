@@ -33,6 +33,7 @@ from app.models.saju_order import (  # noqa: F401
     SajuReportRow,
 )
 from app.models.saju_share import SajuShareRow  # noqa: F401
+from app.models.talisman import TalismanAssetRow, TalismanOrderRow  # noqa: F401
 from app.models.visit_day import VisitDay  # noqa: F401
 from app.models.watchlist import WatchlistItem  # noqa: F401
 

@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     saju,
     saju_shares,
     stocks,
+    talismans,
     visits,
     watchlist,
 )
@@ -34,5 +35,8 @@ api_router.include_router(saju.router)
 # 를 의도적으로 깨는 자리라 같은 파일에 두지 않았다
 # (endpoints/saju_shares.py · models/saju_share.py 모듈 주석).
 api_router.include_router(saju_shares.router)
+# 디지털 부적 판매. 사주와 같은 결제 키를 쓰지만 **로직은 따로다** — 주문에
+# 개인정보가 없고, 원본은 결제가 확인된 토큰으로만 나간다(endpoints/talismans.py).
+api_router.include_router(talismans.router)
 # 관리자 라우터는 **전체가 X-Admin-Key 로 잠겨 있다** (endpoints/admin.py 모듈 주석).
 api_router.include_router(admin.router)

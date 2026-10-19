@@ -76,7 +76,7 @@ export const metadata: Metadata = {
 export default function PrivacyPolicyPage() {
   return (
     <>
-      <DocHeading title="개인정보처리방침" effectiveOn="2026년 9월 21일" />
+      <DocHeading title="개인정보처리방침" effectiveOn="2026년 10월 19일" />
 
       <Section title="1. 수집하는 개인정보 항목">
         <p>
@@ -147,6 +147,15 @@ export default function PrivacyPolicyPage() {
           추가 질문의 자유 입력란에는 이름·연락처·주민등록번호·건강 상태 등 민감한 내용을
           적지 않는 것을 권장합니다. 이 텍스트는 아래 4항과 같이 AI 제공사에 별도의
           비식별 처리 없이 전달됩니다.
+        </p>
+
+        <p className="pt-2">
+          <strong className="font-semibold text-ink">디지털 부적을 구매하실 때</strong>
+        </p>
+        <p>
+          이름·연락처·생년월일 등 개인을 알아볼 수 있는 정보를 받지 않습니다. 주문 정보
+          (주문 번호, 고른 부적, 금액, 결제 상태, 결제 식별자)만 저장하며, 결제 대조와 아래
+          3항의 법령상 거래 기록 보존을 위해 보관합니다.
         </p>
 
         <p className="pt-2">

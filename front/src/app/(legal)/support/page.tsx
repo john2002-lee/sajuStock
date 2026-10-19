@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RETENTION_DAYS, SUPPORT_EMAIL } from "@/lib/config/public";
-import { REFUND_REQUEST_FIELDS } from "@/shared/legal/refund";
+import { REPORT_PRODUCT_NAME } from "@/shared/legal/product";
+import { REFUND_ON_FAILURE, REFUND_REQUEST_FIELDS } from "@/shared/legal/refund";
+import { TALISMAN_DOWNLOAD_DAYS, TALISMAN_PRODUCTS } from "@/shared/legal/talisman";
 import { BusinessInfoTable } from "../_components/BusinessInfoTable";
 import { DocHeading, Section } from "../_components/Section";
 
@@ -33,12 +35,19 @@ export const metadata: Metadata = {
   description: "AI Of Tellers 문의 접수처와 문의 유형별 안내.",
 };
 
+// 결제창·영수증에 찍히는 이름은 토스 주문명이다. 카드 명세서에는 보통 가맹점 상호가
+// 찍히므로 그쪽은 약속하지 않는다. 상품명 상수에서 그대로 가져와야 상품이 늘거나
+// 이름이 바뀌어도 이 안내가 뒤처지지 않는다.
+const STATEMENT_NAMES = [REPORT_PRODUCT_NAME, ...TALISMAN_PRODUCTS.map((t) => t.name)]
+  .map((name) => `“${name}”`)
+  .join(", ");
+
 const INQUIRY_GUIDE: readonly { 유형: string; 안내: string }[] = [
   {
     유형: "결제 문의",
     안내:
       "결제 실패, 중복 결제, 영수증이 필요하신 경우 주문번호와 결제하신 날짜를 함께 " +
-      "보내 주세요. 카드 명세서에는 “AI Of Tellers 정밀 사주 리포트” 로 표시됩니다.",
+      `보내 주세요. 결제창과 결제 영수증에는 구매하신 상품에 따라 ${STATEMENT_NAMES} 로 표시됩니다.`,
   },
   {
     유형: "리포트를 받지 못한 경우",
@@ -54,8 +63,18 @@ const INQUIRY_GUIDE: readonly { 유형: string; 안내: string }[] = [
       "보내 주시면 확인 후 안내해 드립니다.",
   },
   {
+    유형: "부적 원본을 받지 못한 경우",
+    안내:
+      `디지털 부적 원본은 결제 후 ${TALISMAN_DOWNLOAD_DAYS}일 안에 한 번만 내려받을 수 ` +
+      "있습니다. 결제는 됐는데 원본을 받지 못하셨다면(내려받는 도중 실패 포함) " +
+      "주문번호를 보내 주세요. 담당자가 확인한 뒤 다시 받으실 수 있게 해 드리고, " +
+      `그러지 못하면 ${REFUND_ON_FAILURE}`,
+  },
+  {
     유형: "환불 문의",
-    안내: "환불 가능 여부는 리포트 제공 상태에 따라 달라집니다. 환불정책을 먼저 확인해 주세요.",
+    안내:
+      "환불 가능 여부는 리포트 제공 상태, 부적은 원본을 받을 수 있게 되었는지에 따라 " +
+      "달라집니다. 환불정책을 먼저 확인해 주세요.",
   },
   {
     유형: "개인정보 문의",
@@ -74,7 +93,7 @@ const INQUIRY_GUIDE: readonly { 유형: string; 안내: string }[] = [
 export default function SupportPage() {
   return (
     <>
-      <DocHeading title="고객센터" effectiveOn="2026년 9월 21일" />
+      <DocHeading title="고객센터" effectiveOn="2026년 10월 20일" />
 
       <Section title="문의 접수">
         {SUPPORT_EMAIL ? (

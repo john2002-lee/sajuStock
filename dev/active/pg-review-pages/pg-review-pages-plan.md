@@ -50,7 +50,7 @@
   결제되지 않습니다."** 를 넣는다.
 - 사업자 정보 실제 값은 아직 없다 → **환경변수로 분리만** 한다.
 - 상품은 현재 1개 그대로.
-- 문의 채널은 **maverock@daum.net** 이메일.
+- 문의 채널은 **cs@aiot21.com** 이메일.
 
 ---
 
@@ -110,7 +110,7 @@
 |---|---|
 | `shared/legal/business.ts` | 값을 `NEXT_PUBLIC_BIZ_*` 에서 읽고, `IS_PLACEHOLDER` 를 **파생**으로. 전화번호·호스팅 제공자 추가 |
 | `shared/legal/business.test.ts` (신규) | 파일 주석이 약속한 그 테스트 — 값이 채워졌는데 고지가 남거나 그 반대인 상태를 막는다 |
-| `front/.env.deploy`, Vercel | `NEXT_PUBLIC_SUPPORT_EMAIL=maverock@daum.net` + `NEXT_PUBLIC_BIZ_*` 자리 |
+| `front/.env.deploy`, Vercel | `NEXT_PUBLIC_SUPPORT_EMAIL=cs@aiot21.com` + `NEXT_PUBLIC_BIZ_*` 자리 |
 
 `SUPPORT_EMAIL` 이 비어 있어서 지금 **이용약관과 개인정보처리방침에 "문의 이메일이 아직
 설정되지 않았습니다" 라는 TODO 문구가 그대로 노출**되고 있고, 결제가 막힌 사람에게
@@ -128,7 +128,7 @@
 | `app/(legal)/_components/BusinessInfoTable.tsx` (신규) | 사업자 정보 표 + 임시값 고지 |
 | `shared/legal/refund.ts` (신규) | 환불 기준 데이터. 순수 `.ts` 라 테스트가 닿는다 |
 | `app/(legal)/refund/page.tsx` (신규) | 환불정책. 약관 제6조·백엔드 `needs_attention` 문장과 **모순되지 않아야** 한다 |
-| `app/(legal)/support/page.tsx` (신규) | 고객센터. maverock@daum.net, 문의 유형별 안내, 필수 기재 정보 |
+| `app/(legal)/support/page.tsx` (신규) | 고객센터. cs@aiot21.com, 문의 유형별 안내, 필수 기재 정보 |
 | `app/(legal)/terms/page.tsx` | 제2조에서 주식 서비스와 "성향을 종목 판단에 결합" 삭제 — **그 방향은 접었고** 주식은 관리자 전용이다. 제3조 회원가입도 공개 상품에는 없다 |
 | `features/saju/components/PaySuccessScreen.tsx`, `PaidReportScreen.tsx` | 환불 약속 옆에 `/support` 링크를 **조건 없이** |
 

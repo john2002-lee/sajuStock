@@ -25,7 +25,7 @@
 - [x] `shared/legal/business.ts` — `NEXT_PUBLIC_BIZ_*` (ASCII), `IS_PLACEHOLDER`
       파생화, 전부 아니면 전무, `000-00-00000` 거부, 전화번호·호스팅 추가
 - [x] `shared/legal/business.test.ts` — 16건 (주석이 약속만 하던 그 테스트)
-- [x] `.env.deploy` — `NEXT_PUBLIC_SUPPORT_EMAIL=maverock@daum.net` + BIZ 자리
+- [x] `.env.deploy` — `NEXT_PUBLIC_SUPPORT_EMAIL=cs@aiot21.com` + BIZ 자리
 
 ## 3단계 — 법적 페이지 ✅
 - [x] `app/(legal)/_components/Section.tsx` — 두 벌 중복 통합 + `DocHeading`

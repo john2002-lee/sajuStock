@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 export default function RefundPolicyPage() {
   return (
     <>
-      <DocHeading title="환불정책" effectiveOn="2026년 10월 19일" />
+      <DocHeading title="환불정책" effectiveOn="2026년 10월 20일" />
 
       <Section title="1. 이 정책이 다루는 것">
         <p>

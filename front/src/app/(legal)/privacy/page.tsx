@@ -76,7 +76,7 @@ export const metadata: Metadata = {
 export default function PrivacyPolicyPage() {
   return (
     <>
-      <DocHeading title="개인정보처리방침" effectiveOn="2026년 10월 19일" />
+      <DocHeading title="개인정보처리방침" effectiveOn="2026년 10월 20일" />
 
       <Section title="1. 수집하는 개인정보 항목">
         <p>

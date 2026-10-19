@@ -52,7 +52,8 @@ export const TALISMAN_PRICE = 3000;
 export const TALISMAN_DOWNLOAD_DAYS = 7;
 
 /** 무엇을 받는가. */
-export const TALISMAN_FORMAT_NOTE = "PNG 이미지 한 장 (511×1024)";
+// 부적마다 잘라 낸 폭이 1px 씩 다르다(510~511). 세로만 같으므로 세로로 적는다.
+export const TALISMAN_FORMAT_NOTE = "PNG 이미지 한 장 (세로 1024px)";
 
 /** 언제 받는가. */
 export const TALISMAN_DELIVERY_NOTE = `결제 승인 즉시 원본을 내려받을 수 있으며, 결제 후 ${TALISMAN_DOWNLOAD_DAYS}일 안에 한 번만 받으실 수 있습니다.`;

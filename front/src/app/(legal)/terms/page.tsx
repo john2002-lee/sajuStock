@@ -47,7 +47,7 @@ export const metadata: Metadata = {
 export default function TermsOfServicePage() {
   return (
     <>
-      <DocHeading title="이용약관" effectiveOn="2026년 10월 19일" />
+      <DocHeading title="이용약관" effectiveOn="2026년 10월 20일" />
 
       <Section title="제1조 (목적)">
         <p>

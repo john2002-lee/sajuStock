@@ -966,6 +966,59 @@ textarea {
 }
 
 @layer components {
+  /* 첫 화면 좌우 분위기 그림 (`features/saju/components/AmbientSides`).
+     폭은 본문(64rem) 바깥 여백 + 3rem — 안쪽 3rem 은 마스크로 녹아 본문 가장자리
+     아래로 살짝 스며든다. 라이트에서는 곱하기(multiply)로 종이에 번진 먹처럼,
+     다크에서는 스크린(screen)으로 등불·달빛만 떠오르게 한다. */
+  .saju-ambient {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    z-index: -1;
+    display: none;
+    width: max(0px, calc((100vw - 64rem) / 2 + 3rem));
+    background-size: cover;
+    background-repeat: no-repeat;
+    pointer-events: none;
+    opacity: 0.14;
+    mix-blend-mode: multiply;
+    filter: saturate(0.85) brightness(1.25);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  [data-theme="terminal"] .saju-ambient {
+    opacity: 0.28;
+    mix-blend-mode: screen;
+    filter: saturate(0.9);
+  }
+  @media (min-width: 1280px) {
+    .saju-ambient {
+      display: block;
+    }
+  }
+  .saju-ambient--left {
+    left: 0;
+    background-image: url("/ambient/left-fan.webp");
+    background-position: right center;
+    -webkit-mask-image:
+      linear-gradient(to right, #000 40%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 22%, #000 72%, transparent 100%);
+    mask-image:
+      linear-gradient(to right, #000 40%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 22%, #000 72%, transparent 100%);
+  }
+  .saju-ambient--right {
+    right: 0;
+    background-image: url("/ambient/right-feather.webp");
+    background-position: right center;
+    -webkit-mask-image:
+      linear-gradient(to left, #000 40%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 22%, #000 72%, transparent 100%);
+    mask-image:
+      linear-gradient(to left, #000 40%, transparent 100%),
+      linear-gradient(to bottom, transparent 0%, #000 22%, #000 72%, transparent 100%);
+  }
+
   .bg-gold-gradient {
     background-image: var(--gradient-primary-gold);
   }

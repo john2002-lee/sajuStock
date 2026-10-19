@@ -17,6 +17,7 @@ export { TeaserScreen } from "./components/TeaserScreen";
 export { ReportScreen } from "./components/ReportScreen";
 export { IntroStory } from "./components/IntroStory";
 export { NoticePopup } from "./components/NoticePopup";
+export { AmbientSides } from "./components/AmbientSides";
 export { PaySuccessScreen } from "./components/PaySuccessScreen";
 export { PayFailNotice } from "./components/PayFailNotice";
 export { PaidReportScreen } from "./components/PaidReportScreen";

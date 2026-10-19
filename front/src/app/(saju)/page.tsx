@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { NoticePopup, SajuEntry } from "@/features/saju";
+import { AmbientSides, SajuEntry } from "@/features/saju";
 import { getBirthPlaces } from "@/features/saju/server";
 import { LottoSection } from "@/features/lotto/server";
+import { TalismanSection } from "@/features/talisman";
 import type { Metadata } from "next";
 
 /**
@@ -43,16 +44,12 @@ export default async function HomePage() {
   const places = await getBirthPlaces();
   return (
     <>
-      {/* 추석·오픈 기념 인사. **조건 없이 뜨고 스스로 사라지지 않는다** —
-          이벤트는 토스 키에도 가격에도 묶여 있지 않으므로 파생시킬 값이 없다.
-          **내릴 때가 되면 이 한 줄을 지운다.** 날짜로 자동 종료하려면 서버 시각으로
-          판정해 내려보내야 한다(화면이 `new Date()` 를 보면 기기 시계를 옮기는
-          것만으로 기간이 바뀐다 — 지워진 `isFreeEvent` 가 그 모양이었다).
-          혜택은 약속하지 않는다 — 무료 행사는 닫혔고 리포트 가격은 1,000원이다.
-          (결제가 아직 테스트 키로 도는 것은 팝업이 아래에 한 줄로 따로 말한다.)
-          닫았는지는 `localStorage` 에 있어 팝업이 스스로 본다. */}
-      <NoticePopup active />
+      {/* 좌우 분위기 그림. 넓은 화면에서만, 본문 뒤에 반투명으로 (`AmbientSides`). */}
+      <AmbientSides />
       <SajuEntry places={places} />
+      {/* 부적은 사주 입력 **다음**, 로또 **앞**이다(사용자가 정한 자리). 사주를 보러 온
+          사람의 첫 일을 밀어내지 않으면서, 로또보다는 먼저 닿게. */}
+      <TalismanSection />
       {/* 로또 조합은 **폼 다음** 이다. 이 화면에 온 사람이 하러 온 일은 사주
           입력이고, 로또는 그 일을 마치거나 내려보다가 만나면 된다. 앞에 두면
           입력 칸을 접힘 아래로 밀어낸다.

@@ -60,7 +60,10 @@ export default function SajuServiceLayout({
     // 하단 여백은 없다. `ServiceBar` 를 걷어내면서 가릴 바가 사라졌다 (위 주석).
     <div
       data-service="saju"
-      className="bg-sun-glow min-h-screen bg-background text-ink-body"
+      // `isolate` — 첫 화면의 좌우 분위기 그림(`AmbientSides`, `z-index: -1`)이 이
+      // 배경 **위**, 본문 **아래**에 놓이게 하는 쌓임 맥락이다. 없으면 그림이 이
+      // 배경에 가려 보이지 않는다.
+      className="bg-sun-glow isolate min-h-screen bg-background text-ink-body"
     >
       {/* 헤더가 여기 있는 이유: 사주 화면 넷이 전부 같은 헤더를 든다. 페이지마다
           붙이면 한 곳은 반드시 빠지고, 그 화면만 나갈 길이 없어진다. */}

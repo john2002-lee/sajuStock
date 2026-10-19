@@ -1,4 +1,5 @@
 import type { DefaultSession } from "next-auth";
+import type { Role } from "@/lib/auth/roles";
 
 /**
  * NextAuth 세션에 우리 필드를 더한다 — **모듈 보강(module augmentation)이다.**
@@ -19,7 +20,7 @@ declare module "next-auth" {
     user: {
       id: string;
       /** `users.role`. 어댑터가 `select *` 로 읽어 세션 콜백까지 실려 온다 */
-      role: "user" | "admin";
+      role: Role;
     } & DefaultSession["user"];
   }
 
@@ -34,6 +35,6 @@ declare module "next-auth" {
  */
 declare module "next-auth/jwt" {
   interface JWT {
-    role?: "user" | "admin";
+    role?: Role;
   }
 }

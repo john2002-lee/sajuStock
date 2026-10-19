@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/session-cookie";
 import { burnPasswordTime, verifyPassword } from "@/lib/auth/password";
 import { authPool } from "@/lib/auth/pool";
+import { canSignIn, toRole } from "@/lib/auth/roles";
 
 /**
  * NextAuth v5 (Auth.js) 구성.
@@ -230,7 +231,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   callbacks: {
     /**
-     * 로그인 문턱 — **관리자가 아니면 들이지 않는다.**
+     * 로그인 문턱 — **관리자와 열람자(`viewer`)가 아니면 들이지 않는다.**
+     *
+     * 열람자는 주식 서비스만 보는 공용 계정이다. `/admin` 은 `adminActorOf` 가 따로
+     * 막으므로 여기서 들여도 운영 권한은 생기지 않는다 (`lib/auth/roles`).
      *
      * ## 왜 문턱이 필요한가
      *
@@ -271,7 +275,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (!hasDatabase) return false;
 
       const known = await findUserByEmail(email);
-      return known?.role === "admin";
+      return canSignIn(known?.role);
     },
 
     /**
@@ -301,8 +305,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       // **기본값이 `"user"` 인 것이 중요하다.** 컬럼이 없는 환경(마이그레이션 전)에서
       // `undefined` 가 그대로 흐르면, 그 값을 비교하는 쪽이 실수 한 번으로 통과시킬
-      // 여지가 생긴다. 모르면 권한 없음이다.
-      token.role = rows[0].role === "admin" ? "admin" : "user";
+      // 여지가 생긴다. 모르면 권한 없음이다 (`toRole`).
+      token.role = toRole(rows[0].role);
       return token;
     },
 
@@ -315,7 +319,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
      */
     session({ session, token }) {
       if (token.sub) session.user.id = token.sub;
-      session.user.role = token.role === "admin" ? "admin" : "user";
+      session.user.role = toRole(token.role);
       return session;
     },
     /**

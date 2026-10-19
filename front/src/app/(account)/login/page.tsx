@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { auth, AUTH_ENABLED, PASSWORD_LOGIN_ENABLED, signIn } from "@/auth";
 import { safeNextPath } from "@/lib/auth/next-path";
+import { adminActorOf } from "@/lib/auth/admin";
+import { homePathFor } from "@/lib/auth/roles";
 import { SIGNUP_ENABLED } from "@/lib/auth/signup";
 import { marketCaptionSuffix } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
@@ -72,7 +74,7 @@ const ERROR_MESSAGES: Record<string, string> = {
    * 인증 안 된 계정도 여기로 온다 (`auth.ts` 의 authorize).
    */
   CredentialsSignin:
-    "이메일 또는 비밀번호가 올바르지 않습니다. 가입 후 이메일 인증을 마치지 않았다면 " +
+    "아이디 또는 비밀번호가 올바르지 않습니다. 가입 후 이메일 인증을 마치지 않았다면 " +
     "받은 메일의 링크를 먼저 열어 주세요.",
 };
 
@@ -91,19 +93,22 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
    * 부르므로, 검사가 없으면 우리 도메인의 로그인 화면을 지나 남의 사이트로
    * 도착하는 링크가 만들어진다 (`lib/auth/next-path` 주석).
    *
-   * 돌아갈 자리를 들고 오지 않았으면 **관리자 화면**으로 보낸다. 예전 기본값은
-   * `/dashboard` 였다 — 그때는 누구나 로그인할 수 있었기 때문이다. 지금은
-   * `auth.ts` 의 `signIn` 콜백이 관리자가 아닌 사람을 문턱에서 돌려보내므로 여기까지
-   * 온 사람은 운영자이고, 그에게 첫 화면은 운영 현황이어야 한다. **주식 서비스로
-   * 들어가는 문도 그 화면에 있다** (`app/admin/_components/AdminShell.tsx`).
+   * 돌아갈 자리를 들고 오지 않았으면 **권한이 정한다** — 관리자는 운영 현황,
+   * 열람자(guest)는 주식 서비스다 (`homePathFor`). 관리자 판단은 `adminActorOf` 가
+   * 한다 — 역할만 보면 `ADMIN_EMAILS` 씨앗 관리자가 빠진다. 열람자를 `/admin` 으로 보내면
+   * 로그인에 성공하고도 404 를 본다.
+   *
+   * 로그인 시점에는 권한을 아직 모르므로, 그 경우 로그인 뒤 **이 화면으로 한 번
+   * 돌아온다.** 아래 "이미 로그인했으면" 갈래가 세션의 권한을 보고 보낸다.
    */
-  const target = safeNextPath(next) ?? "/admin";
+  const explicitNext = safeNextPath(next);
+  const target = explicitNext ?? "/login";
 
-  // 이미 로그인했으면 여기 머물 이유가 없다. **`target` 으로 보낸다** — 다른 탭에서
-  // 이미 로그인한 상태로 이 링크를 따라온 경우, 대시보드로 보내면 방금 누른 것과
-  // 무관한 화면이 뜬다.
+  // 이미 로그인했으면 여기 머물 이유가 없다. **`next` 가 있으면 그리로 보낸다** —
+  // 다른 탭에서 이미 로그인한 상태로 이 링크를 따라온 경우, 첫 화면으로 보내면
+  // 방금 누른 것과 무관한 화면이 뜬다.
   const session = await auth();
-  if (session?.user) redirect(target);
+  if (session?.user) redirect(explicitNext ?? homePathFor(Boolean(adminActorOf(session))));
 
   const errorMessage = error
     ? (ERROR_MESSAGES[error] ?? DEFAULT_ERROR)
@@ -134,7 +139,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           style={{ fontSize: 12.5, lineHeight: 1.65 }}
         >
           <strong>계정은 운영·관리용입니다.</strong> 공개 회원가입은 열려 있지 않고,
-          관리자로 등록된 계정만 로그인할 수 있습니다.{" "}
+          발급된 계정만 로그인할 수 있습니다.{" "}
           {/* 태그 옆의 줄바꿈은 JSX 가 공백째 지운다 — `{" "}` 로 명시한다 */}
           <strong>사주는 로그인 없이</strong> 처음부터 끝까지 이용하실 수 있으니, 사주를
           보러 오셨다면 이 화면을 지나치셔도 됩니다.
@@ -164,7 +169,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   // **실패해도 돌아갈 자리를 잃지 않는다.** 여기서 `next` 를 떨어뜨리면
                   // 비밀번호를 한 번 틀린 사람만 대시보드로 가게 된다.
                   const query = new URLSearchParams({ error: error.type });
-                  if (next) query.set("next", target);
+                  if (explicitNext) query.set("next", explicitNext);
                   redirect(`/login?${query}`);
                 }
                 throw error;
@@ -177,15 +182,19 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               className="font-mono uppercase tracking-label text-muted-45"
               style={{ fontSize: 10 }}
             >
-              이메일 · 비밀번호
+              아이디 · 비밀번호
             </label>
+            {/* `type="email"` 이 아니다 — 공용 열람 계정의 아이디가 `guest` 처럼
+                `@` 없는 이름이라, 브라우저 검사가 그 계정을 제출 전에 막는다. */}
             <input
               id="password-email"
               name="email"
-              type="email"
+              type="text"
               required
-              autoComplete="email"
-              placeholder="you@example.com"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="아이디"
               className="min-h-[var(--tap)] border border-line-control bg-field px-3.5 py-2.5"
               style={{ fontSize: 13.5 }}
             />

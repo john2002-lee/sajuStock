@@ -488,3 +488,24 @@ async def test_ops_says_nothing_ran_when_there_is_no_record(
 
     assert batch["last_run_at"] is None
     assert batch["last_run_ok"] is None
+
+
+def test_viewer_role_is_reported_as_viewer() -> None:
+    """공용 열람 계정(guest)은 `viewer` 다. `user` 로 뭉개 보내면 관리 화면이 그 계정을
+    일반 회원으로 그리고, 관리자는 그것이 로그인되는 계정이라는 사실을 모른다."""
+    from app.api.v1.endpoints.admin import _to_user
+    from app.repositories.admin import AdminUserRow
+
+    row = AdminUserRow(
+        id=_MEMBER_ID,
+        email="guest",
+        name="Guest",
+        image=None,
+        role="viewer",
+        email_verified=None,
+        watchlist_count=0,
+        has_profile=False,
+        active_sessions=0,
+    )
+    assert _to_user(row).role == "viewer"
+    assert _to_user(AdminUserRow(**{**row.__dict__, "role": "root"})).role == "user"

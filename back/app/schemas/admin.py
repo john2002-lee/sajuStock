@@ -8,7 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-Role = Literal["user", "admin"]
+#: `viewer` 는 주식 서비스만 보는 공용 계정이다 (front `lib/auth/roles`).
+Role = Literal["user", "viewer", "admin"]
 
 
 class AdminUser(BaseModel):

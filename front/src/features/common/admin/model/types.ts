@@ -3,7 +3,7 @@
 // Wire 타입(snake_case)과 화면 타입(camelCase)을 나누는 것은 이 프로젝트의 다른
 // feature 와 같은 규칙이다 — 백엔드 필드명이 바뀌어도 컴포넌트는 손대지 않는다.
 
-export type Role = "user" | "admin";
+export type Role = "user" | "viewer" | "admin";
 
 /** back/app/schemas/admin.py : AdminUser */
 export interface WireAdminUser {

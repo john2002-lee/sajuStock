@@ -120,7 +120,7 @@ export function UserTable({ rows, total }: UserTableProps) {
 }
 
 /**
- * 권한 뱃지. 관리자만 반전 solid 다.
+ * 권한 뱃지. 관리자만 반전 solid 다. `viewer` 는 주식 서비스만 보는 공용 계정이다.
  *
  * 일반 회원에게도 뱃지를 그리는 이유: 빈칸으로 두면 "권한 정보를 못 받았다" 와
  * "일반 회원이다" 가 화면에서 같아진다.
@@ -134,7 +134,7 @@ export function RoleBadge({ role }: { role: AdminUser["role"] }) {
       }`}
       style={{ fontSize: 9 }}
     >
-      {admin ? "admin" : "user"}
+      {role}
     </span>
   );
 }

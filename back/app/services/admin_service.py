@@ -39,7 +39,7 @@ from app.services import advice_cache
 logger = logging.getLogger(__name__)
 
 #: 허용 권한. 열거를 DB 타입이 아니라 여기 두는 이유는 마이그레이션에 적었다.
-ROLES = ("user", "admin")
+ROLES = ("user", "viewer", "admin")
 
 ADMIN_ROLE = "admin"
 

@@ -1,5 +1,6 @@
 import { authPool } from "@/lib/auth/pool";
 import { hashPassword } from "@/lib/auth/password";
+import { toRole, type Role } from "@/lib/auth/roles";
 
 /**
  * 비밀번호 로그인이 쓰는 `users` 조회·쓰기.
@@ -23,7 +24,7 @@ export interface CredentialUser {
   email: string;
   name: string | null;
   image: string | null;
-  role: string;
+  role: Role;
   passwordHash: string | null;
   emailVerified: Date | null;
 }
@@ -62,8 +63,8 @@ export async function findUserByEmail(email: string): Promise<CredentialUser | n
     email: row.email,
     name: row.name,
     image: row.image,
-    // 모르면 권한 없음이다 (`auth.ts` 의 session 콜백과 같은 기본값).
-    role: row.role === "admin" ? "admin" : "user",
+    // 모르면 권한 없음이다 (`lib/auth/roles`).
+    role: toRole(row.role),
     passwordHash: row.password_hash,
     emailVerified: row.emailVerified,
   };

@@ -700,5 +700,6 @@ SajuStock 은 "영업일 기준 1일 이내에 **처리해 드립니다**" 였�
 - `NEXT_PUBLIC_SAJU_RETENTION_DAYS` 는 백엔드 `saju_order_retention_days` 와 같아야
   합니다. 법적 문서가 백엔드를 조회할 이유가 없어 앞의 값을 쓰고, 기본값을 30 으로
   맞춰 두었습니다.
-- 사업자 정보와 개인정보 보호책임자는 **임시값**입니다. 실제 값을 받으면
-  `shared/legal/business.ts` 를 채우고 `IS_PLACEHOLDER` 를 false 로 내립니다.
+- 사업자 정보와 개인정보 보호책임자는 Vercel 환경변수 `NEXT_PUBLIC_BIZ_*` 에서 옵니다.
+  `IS_PLACEHOLDER` 는 그 값에서 파생되며, 통신판매업 신고번호만 비면 그 칸이
+  "신고 준비 중" 으로 나갑니다(`shared/legal/business.ts` 머리말).

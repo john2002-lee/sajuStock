@@ -28,12 +28,21 @@
  * 그래서 필수 항목이 하나라도 비었거나 형식이 틀리면 표 전체가 임시값으로 떨어지고
  * `PLACEHOLDER_NOTICE` 가 함께 나온다.
  *
+ * **통신판매업 신고번호만은 예외다.** 신고에는 PG 가 발급하는 구매안전서비스
+ * 이용확인증이 필요한데, 그 PG 는 사업자 정보가 사이트에 떠 있어야 심사를 한다.
+ * 이 번호 하나 때문에 표 전체를 임시값으로 떨어뜨리면 그 순환을 끊을 수 없다.
+ * 그래서 이 칸이 비면 지어내지 않고 `ECOMMERCE_PENDING` 이라고 **사실대로** 적고,
+ * 나머지 다섯 칸은 실제 값으로 선다. 번호를 넣으면 이 표시는 저절로 내려간다.
+ *
  * 형식 검사는 `public.ts` 의 `resolveSupportEmail` 이 예약 도메인을 떨어뜨리는 것과
  * 같은 장치다 — **자리값을 환경변수에 붙여넣어도 진짜로 통과하지 못하게** 한다.
  * `000-00-00000` 은 사업자등록번호 형식은 맞지만 유효한 번호가 아니다.
  */
 
-/** 전자상거래법 제13조가 요구하는 항목들. 한 줄이라도 비면 전체가 임시값이 된다. */
+/**
+ * 전자상거래법 제13조가 요구하는 항목들. 한 줄이라도 비면 전체가 임시값이 된다 —
+ * 통신판매업신고번호만 예외다(머리말).
+ */
 export interface BusinessInfo {
   상호: string;
   대표자: string;
@@ -114,7 +123,15 @@ export interface ResolvedBusiness {
   readonly officer: PrivacyOfficer;
   /** 아래 값이 실제 사업자 정보가 아니라 임시값인가. */
   readonly isPlaceholder: boolean;
+  /**
+   * 사업자 정보는 실제인데 통신판매업 신고번호만 아직 없는가. 공정위 조회 링크는
+   * 이때 걸지 않는다 — 신고 전에는 눌러 봐야 "조회 결과 없음" 이다.
+   */
+  readonly ecommercePending: boolean;
 }
+
+/** 통신판매업 신고 전에 그 칸에 적는 말. 번호처럼 보이는 것을 지어내지 않는다. */
+export const ECOMMERCE_PENDING = "신고 준비 중";
 
 /**
  * 환경변수를 표로 바꾼다. **순수 함수라 테스트가 닿는다.**
@@ -140,15 +157,14 @@ export function resolveBusiness(env: BusinessEnv): ResolvedBusiness {
       : null;
 
   // **하나라도 없으면 전부 임시값이다** (머리말의 "전부 아니면 전무").
-  if (
-    name === null ||
-    owner === null ||
-    regNo === null ||
-    ecommerceNo === null ||
-    address === null ||
-    phone === null
-  ) {
-    return { info: PLACEHOLDER_INFO, officer: PLACEHOLDER_OFFICER, isPlaceholder: true };
+  // 통신판매업 신고번호는 이 판정에 들지 않는다 — 머리말의 예외.
+  if (name === null || owner === null || regNo === null || address === null || phone === null) {
+    return {
+      info: PLACEHOLDER_INFO,
+      officer: PLACEHOLDER_OFFICER,
+      isPlaceholder: true,
+      ecommercePending: false,
+    };
   }
 
   return {
@@ -156,7 +172,7 @@ export function resolveBusiness(env: BusinessEnv): ResolvedBusiness {
       상호: name,
       대표자: owner,
       사업자등록번호: regNo,
-      통신판매업신고번호: ecommerceNo,
+      통신판매업신고번호: ecommerceNo ?? ECOMMERCE_PENDING,
       주소: address,
       전화번호: phone,
     },
@@ -166,6 +182,7 @@ export function resolveBusiness(env: BusinessEnv): ResolvedBusiness {
       연락처: filled(env.officerContact) ?? phone,
     },
     isPlaceholder: false,
+    ecommercePending: ecommerceNo === null,
   };
 }
 
@@ -186,6 +203,9 @@ export const PRIVACY_OFFICER: PrivacyOfficer = RESOLVED.officer;
 
 /** 아래 값이 실제 사업자 정보가 아니라 임시값임을 나타낸다. */
 export const IS_PLACEHOLDER: boolean = RESOLVED.isPlaceholder;
+
+/** 통신판매업 신고번호만 아직 없는가 (`ResolvedBusiness.ecommercePending`). */
+export const ECOMMERCE_IS_PENDING: boolean = RESOLVED.ecommercePending;
 
 /**
  * 호스팅 서비스 제공자. 전자상거래법이 사업자 정보와 함께 요구한다.

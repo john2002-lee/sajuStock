@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { QUOTE_DELAY_NOTE } from "@/lib/config/marketHours";
 import { RETENTION_DAYS, SUPPORT_EMAIL } from "@/lib/config/public";
-import { BUSINESS_INFO, IS_PLACEHOLDER, businessRows } from "@/shared/legal/business";
+import {
+  BUSINESS_INFO,
+  ECOMMERCE_IS_PENDING,
+  IS_PLACEHOLDER,
+  businessRows,
+} from "@/shared/legal/business";
 
 /**
  * 전역 푸터 — 고지와 서비스 간 이동을 모든 화면에 상시 노출한다.
@@ -160,15 +165,21 @@ export function Footer({
             {businessRows()
               .map(([label, value]) => `${label} ${value}`)
               .join(" · ")}
-            {" · "}
-            <a
-              href={`https://www.ftc.go.kr/bizCommPop.do?wrkr_no=${BUSINESS_INFO.사업자등록번호.replace(/-/g, "")}`}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="hover:text-ink"
-            >
-              사업자정보 확인
-            </a>
+            {/* 공정위 조회는 통신판매업 신고된 사업자만 보여 준다. 신고 전에 걸면
+                눌러 본 사람이 "조회 결과 없음" 을 본다(`BusinessInfoTable` 과 같은 규칙). */}
+            {!ECOMMERCE_IS_PENDING ? (
+              <>
+                {" · "}
+                <a
+                  href={`https://www.ftc.go.kr/bizCommPop.do?wrkr_no=${BUSINESS_INFO.사업자등록번호.replace(/-/g, "")}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="hover:text-ink"
+                >
+                  사업자정보 확인
+                </a>
+              </>
+            ) : null}
           </p>
         ) : null}
       </div>

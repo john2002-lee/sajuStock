@@ -21,12 +21,11 @@ import { DocHeading, Section } from "../_components/Section";
  *
  * ## 채널이 이메일 하나인 이유
  *
- * 소유자가 정했다(maverock@daum.net). 전화·카카오 채널을 적어 두고 받지 못하는
+ * 소유자가 정했다(`NEXT_PUBLIC_SUPPORT_EMAIL`). 전화·카카오 채널을 적어 두고 받지 못하는
  * 것보다, 실제로 확인하는 창구 하나를 적는 편이 낫다 — `public.ts` 의
  * `resolveSupportEmail` 이 죽은 주소를 떨어뜨리는 것과 같은 판단이다.
  *
- * 전화번호는 사업자 정보 표에 있다(전자상거래법 제13조가 요구한다). 발급 전에는
- * 그 표 전체가 임시값으로 표시된다.
+ * 전화번호는 사업자 정보 표에 있다(전자상거래법 제13조가 요구한다).
  */
 
 export const metadata: Metadata = {

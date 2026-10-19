@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { businessRows, resolveBusiness, type BusinessEnv } from "./business.ts";
+import {
+  ECOMMERCE_PENDING,
+  businessRows,
+  resolveBusiness,
+  type BusinessEnv,
+} from "./business.ts";
 
 /**
  * 이 파일은 **오래 약속만 되어 있던 테스트**다.
@@ -44,16 +49,41 @@ describe("전부 갖췄을 때", () => {
   });
 });
 
+describe("통신판매업 신고번호만 없을 때 — 신고 준비 중", () => {
+  // 신고에는 PG 가 발급하는 구매안전서비스 이용확인증이 필요하고, 그 PG 는 사업자
+  // 정보가 사이트에 떠 있어야 심사한다. 번호 하나 때문에 표 전체를 임시값으로
+  // 떨어뜨리면 이 순환을 끊을 수 없다. 그래서 이 칸만은 **사실대로** 비워 둔다.
+  test("나머지 다섯은 실제 값으로 서고, 임시값 고지는 내려간다", () => {
+    const r = resolveBusiness({ ...REAL, ecommerceNo: undefined });
+
+    assert.equal(r.isPlaceholder, false);
+    assert.equal(r.ecommercePending, true);
+    assert.equal(r.info.상호, "에이아이오브텔러스");
+    assert.equal(r.info.통신판매업신고번호, ECOMMERCE_PENDING);
+  });
+
+  test("공백·자리값도 없는 것과 같다", () => {
+    for (const blank of ["", "   ", "(임시) 통신판매업신고번호"]) {
+      assert.equal(resolveBusiness({ ...REAL, ecommerceNo: blank }).ecommercePending, true, blank);
+    }
+  });
+
+  test("번호가 들어오면 준비 중 표시가 저절로 내려간다", () => {
+    const r = resolveBusiness(REAL);
+
+    assert.equal(r.ecommercePending, false);
+    assert.equal(r.info.통신판매업신고번호, "2026-서울강남-01234");
+  });
+
+  test("임시값 표에서는 준비 중이라고 말하지 않는다 — 그 표 전체가 가짜다", () => {
+    assert.equal(resolveBusiness({}).ecommercePending, false);
+  });
+});
+
 describe("하나라도 없으면 **전체가** 임시값", () => {
-  // 절반만 진짜인 표를 막는 것이 이 묶음의 전부다.
-  for (const missing of [
-    "name",
-    "owner",
-    "regNo",
-    "ecommerceNo",
-    "address",
-    "phone",
-  ] as const) {
+  // 절반만 진짜인 표를 막는 것이 이 묶음의 전부다. 통신판매업 신고번호는 위
+  // 묶음이 따로 다룬다.
+  for (const missing of ["name", "owner", "regNo", "address", "phone"] as const) {
     test(`${missing} 하나가 비면 나머지가 진짜여도 표 전체가 임시값이다`, () => {
       const r = resolveBusiness({ ...REAL, [missing]: undefined });
 

@@ -33,7 +33,7 @@ export const metadata: Metadata = {
 export default function RefundPolicyPage() {
   return (
     <>
-      <DocHeading title="환불정책" effectiveOn="2026년 9월 21일" />
+      <DocHeading title="환불정책" effectiveOn="2026년 10월 19일" />
 
       <Section title="1. 이 정책이 다루는 것">
         <p>
@@ -47,7 +47,7 @@ export default function RefundPolicyPage() {
           <Link href="/terms" className="text-ink underline underline-offset-2">
             이용약관
           </Link>{" "}
-          제6조에도 있습니다. 두 문서가 다르게 읽히는 부분이 있다면 이용자에게 유리한
+          제5조의2·제6조에도 있습니다. 두 문서가 다르게 읽히는 부분이 있다면 이용자에게 유리한
           쪽으로 해석합니다.
         </p>
       </Section>

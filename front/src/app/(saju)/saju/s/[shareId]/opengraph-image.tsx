@@ -129,8 +129,10 @@ export default async function Image({
             <div style={{ display: "flex", fontSize: 76, color: BODY }}>
               당신의 사주팔자,
             </div>
+            {/* "정확하게 읽습니다" 를 쓰지 않는다 — 근거는 `SajuEntry.tsx` 머리말.
+                사이트 대표 OG 이미지(`app/opengraph-image.tsx`)와 같은 문구다. */}
             <div style={{ display: "flex", fontSize: 76, color: GOLD }}>
-              정확하게 읽습니다
+              시간부터 바로잡습니다
             </div>
           </div>
           <div

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { REPORT_PRICE, RETENTION_DAYS, SUPPORT_EMAIL } from "@/lib/config/public";
-import { REFUND_ON_FAILURE } from "@/shared/legal/refund";
+import { MINOR_CANCELLATION, REFUND_ON_FAILURE } from "@/shared/legal/refund";
 import {
   DELIVERY_NOTE,
   PAID_INCLUDES,
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 export default function TermsOfServicePage() {
   return (
     <>
-      <DocHeading title="이용약관" effectiveOn="2026년 9월 21일" />
+      <DocHeading title="이용약관" effectiveOn="2026년 10월 19일" />
 
       <Section title="제1조 (목적)">
         <p>
@@ -150,11 +150,25 @@ export default function TermsOfServicePage() {
         </p>
       </Section>
 
+      {/* 새 조를 끝에 붙이지 않고 "의2" 로 끼운 이유: 환불정책·결제 화면이 이미
+          "제6조"·"제10조" 를 번호로 가리킨다. 번호를 밀면 그 참조가 조용히 틀린다. */}
+      <Section title="제5조의2 (미성년자의 결제)">
+        <p>
+          만 19세 미만의 미성년자가 유료 리포트를 구매하려면 법정대리인(부모 등)의 동의를
+          받아야 합니다.
+        </p>
+        <p>
+          법정대리인의 동의 없이 결제한 경우 {MINOR_CANCELLATION} 취소는 아래 제10조의
+          문의처로 요청해 주시기 바랍니다.
+        </p>
+      </Section>
+
       <Section title="제6조 (환불 정책)">
         <p>
           서비스가 제공하는 리포트는 결제 즉시 생성이 시작되는 디지털 콘텐츠로,
           정상적으로 생성이 완료된 리포트에 대해서는 별도의 청약철회·환불을 지원하지
-          않습니다.
+          않습니다. 다만 제5조의2(미성년자의 결제)에 따른 취소는 이 제한과 관계없이
+          할 수 있습니다.
         </p>
         <p>
           다만 결제 처리 중 오류가 발생하거나 리포트 생성이 정상적으로 완료되지 못한

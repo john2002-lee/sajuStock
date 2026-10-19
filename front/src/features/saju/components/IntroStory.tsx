@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { RETENTION_DAYS, REPORT_PRICE } from "@/lib/config/public";
 import { DELIVERY_NOTE, FREE_INCLUDES, PAID_INCLUDES, REPORT_PRODUCT_NAME } from "@/shared/legal/product";
@@ -159,7 +160,34 @@ export function IntroStory() {
               {REPORT_PRICE.toLocaleString("ko-KR")}원
             </p>
           </div>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13.5px] leading-relaxed">
+          {/* **산 사람이 받는 화면 그대로다.** 예시 생년월일로 실제 리포트를 생성해
+              찍었다 — 꾸민 목업이 아니라서 상품 설명과 어긋날 수 없다. 사진이 없으면
+              "무엇을 사는지" 를 글로만 짐작해야 하고, PG 심사도 상품 이미지를 요구한다. */}
+          {/* 높이로 자르지 않고 폭을 줄인다. 잘라 내면 여덟 글자만 남아 "풀이를 산다"
+              는 것이 안 보인다 — 무당의 총평까지 한 장에 들어와야 한다. */}
+          <figure className="mx-auto mt-4 w-[220px]">
+            <div className="relative overflow-hidden rounded-card-sm border border-hairline">
+              <Image
+                src="/saju/report-sample.webp"
+                alt="정밀 사주 리포트 화면 예시 — 여덟 글자 표와 무당이 풀어 주는 총평"
+                width={403}
+                height={760}
+                sizes="220px"
+                className="h-auto w-full"
+              />
+              {/* 띠 색은 테마가 아니라 **사진** 바닥색이다. 사진은 라이트 화면을 찍은
+                  것이라, `from-surface` 를 쓰면 다크에서 크림색 위에 남색 띠가 깔린다. */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#fcfaf8] to-transparent"
+              />
+            </div>
+            <figcaption className="mt-2 text-[12px] leading-relaxed text-muted-2">
+              리포트 화면 예시 · 1990년 5월 15일 오전 9시 30분 서울 출생으로 실제 생성한
+              결과의 앞부분일세. 풀이 문장은 사주마다 다르게 쓰이네.
+            </figcaption>
+          </figure>
+          <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13.5px] leading-relaxed">
             <dt className="text-muted-2">제공 시점</dt>
             <dd className="text-ink-body">{DELIVERY_NOTE}</dd>
             <dt className="text-muted-2">보관 기간</dt>
@@ -176,7 +204,7 @@ export function IntroStory() {
             </dd>
           </dl>
           <p className="mt-3 text-[12.5px] leading-relaxed text-muted-2">
-            값은 여덟 글자를 먼저 본 다음 정하셔도 되네. 결제 화면에서 구성과 환불
+            값은 여덟 글자를 먼저 본 다음 정하셔도 되네. 결제 화면에서 가격과 환불
             조건을 한 번 더 보여 드리네.
           </p>
         </div>

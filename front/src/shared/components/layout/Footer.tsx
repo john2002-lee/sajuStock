@@ -148,7 +148,7 @@ export function Footer({
           <p
             className="font-mono text-muted-45 text-10 tracking-[0.02em]"
           >
-            데이터 제공 Yahoo Finance(yfinance) · KRX · {QUOTE_DELAY_NOTE}
+            KRX · {QUOTE_DELAY_NOTE}
           </p>
         ) : null}
 

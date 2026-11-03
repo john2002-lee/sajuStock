@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { adminActorOf } from "@/lib/auth/admin";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/password";
+import { homePathFor } from "@/lib/auth/roles";
 import { SIGNUP_ENABLED } from "@/lib/auth/signup";
 import { marketCaptionSuffix } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
@@ -31,7 +33,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
   if (!SIGNUP_ENABLED) notFound();
 
   const session = await auth();
-  if (session?.user) redirect("/dashboard");
+  if (session?.user) redirect(homePathFor(Boolean(adminActorOf(session))));
 
   const { error, sent } = await searchParams;
   const caption = `${masthead(new Date().toISOString())} · ${marketCaptionSuffix()}`;

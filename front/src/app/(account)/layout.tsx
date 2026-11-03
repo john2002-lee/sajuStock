@@ -20,7 +20,7 @@ export default function AccountLayout({
   return (
     <>
       {children}
-      <Footer service="both" />
+      <Footer service="saju" />
     </>
   );
 }

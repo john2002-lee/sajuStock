@@ -1,0 +1,129 @@
+/**
+ * 브라우저에서도 읽을 수 있는 설정. **클라이언트 컴포넌트가 import 해도 된다.**
+ *
+ * 옆의 `env.ts` 와 갈라 둔 이유는 이름이 아니라 **경계**다. 그쪽은 백엔드 주소·타임아웃
+ * 처럼 서버만 알아야 하는 값이고, 여기 있는 것은 화면에 그려질 값이다. 한 파일에
+ * 섞으면 클라이언트 컴포넌트가 `env.ts` 를 import 하는 순간 백엔드 주소가 브라우저
+ * 번들로 따라 들어간다.
+ *
+ * Next 는 `NEXT_PUBLIC_*` 를 **정적이고 리터럴인** `process.env.NEXT_PUBLIC_X`
+ * 접근에만 인라인한다. 빌드 시점의 텍스트 치환이라 계산된 키 조회
+ * (`process.env[name]`)는 평가하지 못하고 브라우저에 `undefined` 를 실어 보낸다.
+ * **아래 export 는 반드시 리터럴 접근으로 두고**, 루프나 헬퍼로 리팩터링하지 않는다.
+ */
+
+/**
+ * 결제·리포트 문제로 막힌 고객이 연락할 곳.
+ *
+ * 다른 값처럼 `!` 로 단정하지 않는다 — 이것은 진짜로 선택값이다. 아직 운영 메일함이
+ * 없고, **결제가 막힌 사람에게 "사람이 확인하고 있습니다" 라고 약속하는 바로 그
+ * 순간에 지어낸 주소를 보여 주는 것**은 그 약속을 뒷받침하는 게 아니라 무너뜨린다.
+ * 값이 없으면 화면은 연락처 줄을 빼고 렌더한다.
+ *
+ * 서비스 개시 전에 **실제로 수신되는 주소**로 반드시 설정해야 한다.
+ */
+export const SUPPORT_EMAIL = resolveSupportEmail(process.env.NEXT_PUBLIC_SUPPORT_EMAIL);
+
+/**
+ * 예약 도메인 자리값을 프로덕션 빌드에서 떨어뜨린다.
+ *
+ * `NEXT_PUBLIC_*` 는 **빌드 시점에** 번들로 인라인된다. 그래서 로컬 작업용으로
+ * `support@example.com` 을 켜 둔 기계에서 프로덕션 빌드를 만들면 죽은 주소가
+ * 환불 안내에 박혀 나간다. 그것은 주소가 없는 것보다 나쁘다 — 위 주석이 막으려던
+ * 바로 그 실패에 "메일을 보내고 아무 답도 못 받는" 단계가 하나 더 붙는다.
+ *
+ * example.com/.net/.org 과 .test/.invalid/.example 은 RFC 2606·6761 이 예약해 둔
+ * 도메인이라 **누구도 그곳에서 메일을 받지 않는다.** 따라서 미설정으로 취급해도
+ * 실제 메일함을 버릴 일이 없다. 프로덕션이 아니면 그대로 둔다 — 개발 중에 자리값이
+ * 보이는 것이 이 링크가 존재한다는 사실을 알아차리는 방법이다.
+ */
+function resolveSupportEmail(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  if (process.env.NODE_ENV !== "production") return raw;
+  return /@(example\.(com|net|org)|[^@]*\.(test|invalid|example|localhost))$/i.test(raw)
+    ? undefined
+    : raw;
+}
+
+/**
+ * 결제 보관 기간(일). 법적 문서와 화면이 **같은 숫자**를 말하게 하는 값이다.
+ *
+ * 진짜 출처는 백엔드의 `saju_order_retention_days` 이고, 화면은 대개
+ * `GET /api/saju/payment-config` 로 받는다. 그런데 약관·개인정보처리방침은 결제
+ * 설정을 조회할 이유가 없는 정적 문서다 — 그 한 값을 위해 백엔드에 의존하면
+ * 백엔드가 죽었을 때 법적 문서가 렌더되지 않는다.
+ *
+ * 그래서 여기에 두고, 백엔드와 어긋나지 않도록 **기본값을 같게** 맞춘다.
+ * 백엔드에서 이 값을 바꾸면 `SAJU_RETENTION_DAYS` 도 함께 설정해야 한다.
+ */
+export const RETENTION_DAYS = Number(process.env.NEXT_PUBLIC_SAJU_RETENTION_DAYS ?? 7);
+
+/**
+ * **공개 화면에 적는** 리포트 가격(원).
+ *
+ * 가격의 진짜 출처는 백엔드다(`saju_report_price`). 결제 화면은 지금도 서버가 준
+ * 값으로 그리고, 주문 금액과 승인 검증도 서버가 정한다 — 돈이 걸리는 경로에
+ * 복사본을 두지 않는다는 규칙은 그대로다.
+ *
+ * 이 값은 **결제와 무관한 공개 소개 페이지**(`/saju/intro`)만 쓴다. 그 페이지는
+ * 사업자·가격 정보를 보러 오는 사람과 심사자가 처음 닿는 곳이라 백엔드가 죽어도
+ * 서야 한다. 조회를 붙이면 Cloud Run 이 콜드 스타트인 동안 상점이 오류 화면이
+ * 된다 — 약관·방침이 결제 API 에 기대지 않는 것과 같은 이유다(위 `RETENTION_DAYS`).
+ *
+ * 백엔드에 `saju_report_price == 1000` 을 못박는 테스트가 있어, 가격을 바꾸면
+ * 그 테스트가 깨지면서 이 값도 함께 고치라고 알려 준다.
+ */
+export const REPORT_PRICE = 1000;
+
+/**
+ * 결과 공유 링크의 보관 기간(일). 위 `RETENTION_DAYS` 와 값이 같지만 **묶여 있지
+ * 않다** — 그쪽은 돈을 받고 한 약속이라 판매가 시작되면 구매 시점의 약관에 붙들리고,
+ * 이쪽은 아니다. 백엔드에서도 설정이 둘로 나뉘어 있는 것과 같은 이유다.
+ *
+ * 진짜 출처는 백엔드의 `saju_share_retention_days` 이고, 공유 화면은 그 값을 응답에
+ * 실어 받는다(`SajuSharedReading.retention_days`). 그런데 개인정보처리방침은 공유
+ * 기록을 조회할 이유가 없는 정적 문서다 — 위 `RETENTION_DAYS` 가 존재하는 것과
+ * 똑같은 이유로 여기에도 값이 하나 필요하다.
+ *
+ * 그래서 여기에 두고, 백엔드와 어긋나지 않도록 **기본값을 같게** 맞춘다.
+ * 백엔드에서 이 값을 바꾸면 `SAJU_SHARE_RETENTION_DAYS` 도 함께 설정해야 한다.
+ */
+export const SHARE_RETENTION_DAYS = Number(
+  process.env.NEXT_PUBLIC_SAJU_SHARE_RETENTION_DAYS ?? 7,
+);
+
+/**
+ * Amplitude 수집 키. **브라우저에 나가는 것이 정상인 값이다** — 이벤트를 어느
+ * 프로젝트로 보낼지 가리키는 공개 식별자이고, 이 키로 데이터를 읽을 수는 없다.
+ * 그래서 위의 `ADVICE_API_KEY` 류와 달리 `NEXT_PUBLIC_` 을 붙이는 것이 맞다.
+ *
+ * **미설정이면 분석이 조용히 꺼진다.** `NEXT_PUBLIC_*` 는 빌드 시점 텍스트 치환이라
+ * Vercel 에 이 변수를 넣지 않고 배포하면 번들에 `undefined` 가 박히고, 화면은 멀쩡한데
+ * 이벤트만 한 건도 안 들어온다 — 가장 알아차리기 어려운 실패다. 그래서 초기화하는
+ * 쪽(`shared/analytics`)이 값이 없을 때 콘솔에 경고를 남긴다.
+ */
+export const AMPLITUDE_API_KEY = process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY;
+
+/**
+ * 이 배포가 바깥 세상에 알려진 주소. 예: `https://aiot21.com`
+ *
+ * **절대 URL 이 필요한 곳에만 쓴다.** 화면 안의 이동은 전부 상대 경로이므로 이
+ * 값을 볼 이유가 없다. 지금 쓰는 곳은 둘이다 — 토스 결제 콜백(`PayButton`, 토스가
+ * 상대 경로를 거부한다)과 친구에게 보내는 공유 링크(`features/saju/model/share`).
+ *
+ * 단정하지 않는다. 없으면 공유 링크는 브라우저가 보고 있는 주소로 내려가고
+ * (`shareUrl` 의 `fallback`), 그 편이 빈 링크를 보내는 것보다 낫다.
+ */
+export const APP_ORIGIN = process.env.NEXT_PUBLIC_APP_ORIGIN;
+
+/**
+ * 사주 서비스의 바깥 주소. 예: `https://www.aiot21.com`
+ *
+ * 주식이 별도 프로젝트(`stock-front`)로 갈라져 나오면서 사주 화면은 **이 앱에 없다.**
+ * `/saju/intro` 같은 상대 경로는 여기서 404 이므로, 사주로 건너가는 링크는 전부 이
+ * 값 위에 만든다. 끝에 `/` 를 붙이지 않는다.
+ *
+ * `??` 가 아니라 `||` 다 — 템플릿(`.env.local.example`)을 그대로 복사하면 빈 문자열이
+ * 들어오고, 그때 링크가 상대 경로로 떨어지면 404 다.
+ */
+export const SAJU_SITE_URL = process.env.NEXT_PUBLIC_SAJU_SITE_URL || "https://www.aiot21.com";

@@ -30,12 +30,13 @@ export function canSignIn(role: unknown): boolean {
 /**
  * 돌아갈 자리 없이 로그인했을 때 첫 화면.
  *
- * 관리자는 운영 현황이고, 그 밖은 주식 서비스다 — 열람자를 `/admin` 으로 보내면
- * 로그인에 성공하고도 404 를 보게 된다.
+ * 관리자는 운영 현황이고, 그 밖은 사주 홈이다 — 열람자를 `/admin` 으로 보내면
+ * 로그인에 성공하고도 404 를 보게 된다. 예전에는 주식(`/stock`)이었지만 주식은 별도
+ * 프로젝트(`stock-front`)로 나갔고, 세션 쿠키는 도메인을 넘어가지 않는다.
  *
  * 역할이 아니라 **관리자 판단 결과**를 받는다. 관리자는 `users.role` 말고도
  * `ADMIN_EMAILS` 씨앗으로 정해지고, 그 판단은 `adminActorOf` 한 곳에만 있다.
  */
 export function homePathFor(isAdmin: boolean): string {
-  return isAdmin ? "/admin" : "/stock";
+  return isAdmin ? "/admin" : "/";
 }

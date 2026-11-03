@@ -1,5 +1,6 @@
 import { masthead } from "@/lib/format";
 import type { AdminActor } from "@/lib/auth/admin";
+import { stockRedirect } from "@/lib/routing/stock-paths";
 import { Footer } from "@/shared/components/layout/Footer";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { Icon } from "@/shared/ui";
@@ -42,6 +43,9 @@ export interface AdminShellProps {
  * 않고, 양쪽 고지를 짧게 드는 `both` 를 스스로 붙인다.
  */
 export function AdminShell({ actor, current, children }: AdminShellProps) {
+  // 판정·검증은 proxy 의 리다이렉트와 같은 함수다 — 값이 틀리면 둘 다 조용히 꺼진다.
+  const stockSite = stockRedirect("/stock", "", process.env.STOCK_SITE_URL);
+
   return (
     <>
       <main className="mx-auto flex w-full max-w-shell flex-col gap-4 px-4 pb-[30px] pt-[26px] md:px-8">
@@ -74,27 +78,26 @@ export function AdminShell({ actor, current, children }: AdminShellProps) {
               `aria-current` 가 "지금 이 탭에 있다" 를 거짓으로 말하게 된다.
               그래서 모양도 밑줄이 아니라 테두리 버튼이고, `ml-auto` 로 떨어뜨린다.
 
-              ## 왜 여기가 주식으로 들어가는 유일한 문인가
-
-              사주가 제품의 메인이 되면서 공개 표면(루트·푸터·404)에서 주식 링크를
-              전부 걷어냈다. **차단한 것은 아니다** — `/stock` 주소를 직접 치면
-              누구나 열린다. 개발 중에 되돌리기 쉬운 쪽을 골랐고, 지금 이 링크는
-              "운영자가 자기 개발 화면으로 가는 길" 이다. */}
-          <Link
-            href="/stock"
-            className="-mb-px ml-auto flex min-h-[var(--tap)] items-center gap-1.5 self-center border border-line-28 px-2.5 py-1.5 font-medium text-muted-60 hover:border-ink hover:text-ink md:min-h-0"
-            style={{ fontSize: 12.5 }}
-          >
-            <Icon name="chart" size={14} className="flex-none text-muted-45" />
-            주식 서비스
-            <span aria-hidden>→</span>
-          </Link>
+              주식은 별도 프로젝트(`stock-front`)라 다른 도메인이다. `Link` 가 아니라
+              `<a>` 인 이유가 그것이다 — 클라이언트 탐색·prefetch 가 남의 도메인으로
+              나가지 않게 한다. `STOCK_SITE_URL` 이 없으면 갈 곳이 없으므로 그리지 않는다. */}
+          {stockSite ? (
+            <a
+              href={stockSite}
+              className="-mb-px ml-auto flex min-h-[var(--tap)] items-center gap-1.5 self-center border border-line-28 px-2.5 py-1.5 font-medium text-muted-60 hover:border-ink hover:text-ink md:min-h-0"
+              style={{ fontSize: 12.5 }}
+            >
+              <Icon name="chart" size={14} className="flex-none text-muted-45" />
+              주식 서비스
+              <span aria-hidden>→</span>
+            </a>
+          ) : null}
         </nav>
 
         {children}
       </main>
 
-      <Footer service="both" />
+      <Footer service="saju" />
     </>
   );
 }

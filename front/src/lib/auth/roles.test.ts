@@ -42,7 +42,7 @@ describe("homePathFor — 로그인 뒤 첫 화면", () => {
     assert.equal(homePathFor(true), "/admin");
   });
 
-  test("관리자가 아니면 주식 서비스 — /admin 은 열람자에게 404 다", () => {
-    assert.equal(homePathFor(false), "/stock");
+  test("관리자가 아니면 사주 홈 — /admin 은 열람자에게 404 이고 주식은 별도 사이트다", () => {
+    assert.equal(homePathFor(false), "/");
   });
 });

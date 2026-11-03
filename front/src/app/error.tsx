@@ -41,7 +41,7 @@ export default function RootError({
         />
       </main>
 
-      <Footer service="both" />
+      <Footer service="saju" />
     </>
   );
 }

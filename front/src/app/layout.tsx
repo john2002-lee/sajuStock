@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { SearchProvider } from "@/features/stock/search";
 import { AmplitudeProvider, VisitBeacon } from "@/shared/analytics";
 import { SessionProvider } from "@/shared/auth/SessionProvider";
 import { QueryProvider } from "@/shared/query";
@@ -95,17 +94,12 @@ export default async function RootLayout({
       data-theme={theme === "terminal" ? "terminal" : undefined}
     >
       <body className="flex min-h-full flex-col">
-        {/* 순서: 세션 → 쿼리 캐시 → 테마 → 전역 검색.
-            검색 팔레트가 쿼리 캐시를 쓰므로 QueryProvider 안쪽에 있어야 한다.
-
-            `SearchProvider` 는 주식 서비스 것이지만 여기 남는다. 팔레트는 열렸을
-            때만 마운트되므로 닫혀 있는 동안 비용이 없고, `SearchTrigger` 를 쓰는
-            화면이 `(stock)` 밖에도 있다 — 404 가 그렇다. 프로바이더를 그룹 안으로
-            내리면 그 화면에서 `useSearch()` 가 던진다. */}
+        {/* 순서: 세션 → 쿼리 캐시 → 테마. 종목 검색 팔레트(`SearchProvider`)는
+            주식과 함께 `stock-front` 로 나갔다. */}
         <SessionProvider>
           <QueryProvider>
             <ThemeProvider initialPreference={preference} initialTheme={theme}>
-              <SearchProvider>{children}</SearchProvider>
+              {children}
             </ThemeProvider>
           </QueryProvider>
         </SessionProvider>

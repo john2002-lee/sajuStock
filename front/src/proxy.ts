@@ -1,10 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAMES } from "@/lib/auth/session-cookie";
 import { legacyRedirect } from "@/lib/routing/legacy-paths";
+import { stockRedirect } from "@/lib/routing/stock-paths";
 import { createOwnerKey, isOwnerKey, OWNER_COOKIE } from "@/lib/watchlist/anon-cookie";
 
 /**
- * 관심종목 소유자 쿠키를 발급한다.
+ * 익명 소유자 쿠키를 발급한다.
+ *
+ * 관심종목을 위해 생긴 쿠키지만 주식이 별도 프로젝트로 나간 지금도 남는다 — 사주
+ * 공유(`api/saju/shares`)·방문 기록(`api/visit`)이 같은 소유자 키(`_data/owner`)를 쓴다.
  *
  * **Next 16 에서는 `middleware.ts` 가 아니라 `proxy.ts` 다.** 파일 규약이 바뀌었고
  * (`node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`),
@@ -62,56 +66,24 @@ function blockAnonymousAdmin(request: NextRequest): NextResponse | null {
 }
 
 /**
- * 대시보드에 **세션 쿠키조차 없는 요청**을 렌더 전에 로그인으로 보낸다.
+ * 주식 주소를 주식 사이트로 보낸다 — 주식은 별도 프로젝트(`stock-front`)로 갈라져 나갔다.
  *
- * `blockAnonymousAdmin` 과 같은 층이고 같은 한계다 — 쿠키가 유효한지는 여기서 모른다.
- * 진짜 판단은 `app/dashboard/layout.tsx` 의 `currentUser()` 가 하고, 이건 그 앞의
- * 최적화다.
+ * 판정은 `lib/routing/stock-paths` 가 한다(`legacy-paths` 와 같은 이유). 목적지
+ * `STOCK_SITE_URL` 이 없으면 보내지 않고, 라우트가 없으므로 404 가 된다.
  *
- * ## 페이지의 `redirect()` 만으로 부족한 이유
- *
- * 루트 `loading.tsx` 가 만든 Suspense 경계 때문에 **셸이 먼저 흘러나간다.** 그래서
- * 페이지에서 `redirect()` 를 불러도 상태 코드는 200 이고, Next 는 대신
- * `<meta http-equiv="refresh" content="1;url=/login">` 을 심는다(실측). 로그아웃
- * 상태로 주소를 치면 **홈 골격이 1초 보였다가** 로그인으로 넘어간다 — 가려던 곳도
- * 아닌 화면이 잠깐 뜨는 셈이다. 여기서 끊으면 307 하나로 끝난다.
- *
- * 404 가 아니라 리다이렉트인 것은 관리자 화면과 다른 점이다. 대시보드는 존재를
- * 숨길 이유가 없고(로그인 화면이 "로그인하면 대시보드가 열립니다" 라고 광고한다),
- * 사용자가 할 일이 명확하다 — 로그인.
+ * 경로와 쿼리를 살린다 — 공유된 `/stocks/005930?ai=1` 이 그 종목으로 가야 한다.
+ * 307 인 이유는 아래 `redirectMovedPaths` 와 같다. 도메인이 아직 정해지지 않았고,
+ * 영구 리다이렉트는 브라우저가 캐시해 되돌리기 어렵다.
  */
-function redirectAnonymousDashboard(request: NextRequest): NextResponse | null {
-  // `/dashboard/005930` 도 같은 문이다 — 정확히 일치로 두면 상세 주소가 그냥 통과한다.
-  if (!request.nextUrl.pathname.startsWith("/dashboard")) return null;
+function redirectToStockSite(request: NextRequest): NextResponse | null {
+  const target = stockRedirect(
+    request.nextUrl.pathname,
+    request.nextUrl.search,
+    process.env.STOCK_SITE_URL,
+  );
+  if (target === null) return null;
 
-  const signedIn = SESSION_COOKIES.some((name) => request.cookies.get(name)?.value);
-  if (signedIn) return null;
-
-  return NextResponse.redirect(new URL("/login", request.nextUrl));
-}
-
-/**
- * `/watchlist` 는 **대시보드로 합쳐졌다.** 옛 주소를 데려다준다.
- *
- * 좌측에 담아 둔 종목이 서고 오른쪽에 그 상세가 뜨는 구조가 두 화면에 똑같이 있었다.
- * 같은 것을 두 주소로 두면 어느 쪽이 본체인지 흐려지고 고칠 때마다 두 번 고쳐야 한다.
- *
- * **종목 코드를 살려서 옮긴다** — `/watchlist/005930` → `/dashboard/005930`. 공유된
- * 링크가 "그 종목" 을 가리키고 있었는데 목록 첫 종목으로 떨어뜨릴 이유가 없다.
- *
- * 라우트 파일이 아니라 여기서 처리하는 이유는 `redirectAnonymousDashboard` 와 같다 —
- * 페이지의 `redirect()` 는 셸이 먼저 흘러나가 meta refresh 로 내려가고, 그러면 옛
- * 주소를 연 사람이 **1초짜리 빈 화면**을 먼저 본다. 여기서 끊으면 307 하나다.
- *
- * 308(영구)이 아니라 307 인 것은 의도적이다. 영구 리다이렉트는 브라우저가 캐시해
- * 되돌리기 어렵고, 화면 구조는 아직 손보는 중이다.
- */
-function redirectMovedWatchlist(request: NextRequest): NextResponse | null {
-  const { pathname } = request.nextUrl;
-  if (pathname !== "/watchlist" && !pathname.startsWith("/watchlist/")) return null;
-
-  const moved = pathname.replace("/watchlist", "/dashboard");
-  return NextResponse.redirect(new URL(moved + request.nextUrl.search, request.nextUrl));
+  return NextResponse.redirect(target, 307);
 }
 
 /**
@@ -124,7 +96,7 @@ function redirectMovedWatchlist(request: NextRequest): NextResponse | null {
  * 실수**(`/saju/reports/{token}` 을 함께 튕겨 구매자가 리포트를 잃는 것)가 바로
  * 그 판정에서 난다. 값으로 확인할 수 있는 자리에 두었다.
  *
- * 위 `redirectMovedWatchlist` 와 같은 이유로 페이지의 `redirect()` 가 아니다 —
+ * 페이지의 `redirect()` 가 아니다 —
  * 그쪽은 meta refresh 로 내려가 빈 화면이 1초 스친다. **랜딩에서는 특히 안 된다.**
  *
  * 308 이 아니라 307 인 것도 같은 판단이다. 영구 리다이렉트는 브라우저가 캐시해
@@ -141,14 +113,11 @@ export function proxy(request: NextRequest) {
   const blocked = blockAnonymousAdmin(request);
   if (blocked) return blocked;
 
-  const moved = redirectMovedWatchlist(request);
-  if (moved) return moved;
+  const toStockSite = redirectToStockSite(request);
+  if (toStockSite) return toStockSite;
 
   const relocated = redirectMovedPaths(request);
   if (relocated) return relocated;
-
-  const toLogin = redirectAnonymousDashboard(request);
-  if (toLogin) return toLogin;
 
   const existing = request.cookies.get(OWNER_COOKIE.name)?.value;
   if (isOwnerKey(existing)) return NextResponse.next();

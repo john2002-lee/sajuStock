@@ -20,7 +20,8 @@ import { Masthead } from "@/shared/components/layout/Masthead";
 import { MobileTabBar } from "@/shared/components/layout/MobileTabBar";
 import Link from "next/link";
 import { FindBand } from "./_components/FindBand";
-import { SajuBand } from "./_components/SajuBand";
+// 사주 띠는 꺼 두었다 — 아래 렌더 자리의 주석을 볼 것. 되살릴 때 이 줄도 함께 푼다.
+// import { SajuBand } from "./_components/SajuBand";
 import { RecentStocks } from "./_components/RecentStocks";
 
 /**
@@ -111,8 +112,12 @@ export default async function MarketHomePage() {
 
         {/* 사주 서비스 입구. 종목 진입(FindBand) **다음**이다 — 여기는 주식
             서비스의 홈이고 처음 온 사람도 종목부터 보고 싶어 한다. 앞에 두면
-            종목 하나 보려는 사람에게 다른 서비스를 먼저 들이미는 화면이 된다. */}
-        <SajuBand />
+            종목 하나 보려는 사람에게 다른 서비스를 먼저 들이미는 화면이 된다.
+
+            **지금은 꺼 두었다.** 주식이 별도 사이트(stock-front)로 갈라지면서 주식
+            화면에 사주 콘텐츠를 두지 않기로 했다. 컴포넌트(`_components/SajuBand.tsx`)는
+            나중을 위해 남긴다 — 되살리려면 위 import 와 아래 한 줄의 주석을 푼다. */}
+        {/* <SajuBand /> */}
 
         {/* 지수 8카드 — 앞 넷은 "시장이 지금 어디에 있나", 뒤 넷(반도체·나스닥100·
             유가·금)은 **왜 그렇게 움직였나**를 설명하는 축이다. 뒤 넷에만 한 줄
